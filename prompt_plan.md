@@ -268,7 +268,7 @@ Below is a **sequence of TDD-style prompts**. Each prompt is written as **text**
 * Asks for a minimal test + implementation approach.
 * Ensures no orphan code.
 
-### Prompt 1: Project Setup
+### Prompt 1: Project Setup (COMPLETED)
 
 ```
 You are building the "icloud2hugo" Rust CLI tool. Start by creating a new cargo project with a minimal CLI using Clap. 
