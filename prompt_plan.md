@@ -340,7 +340,7 @@ Implement the first half of the sync logic:
 5. Provide tests that mock iCloud data with some new photos, verify new directories are created, index.yaml is updated, etc.
 ```
 
-### Prompt 6: Sync Logic (Delete)
+### Prompt 6: Sync Logic (Delete) (COMPLETED)
 
 ```
 Continue the sync logic:

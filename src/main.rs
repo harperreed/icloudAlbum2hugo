@@ -91,6 +91,7 @@ async fn main() -> Result<()> {
             let mut added = 0;
             let mut updated = 0;
             let mut unchanged = 0;
+            let mut deleted = 0;
             let mut failed = 0;
             
             for result in &results {
@@ -98,6 +99,7 @@ async fn main() -> Result<()> {
                     sync::SyncResult::Added(_) => added += 1,
                     sync::SyncResult::Updated(_) => updated += 1,
                     sync::SyncResult::Unchanged(_) => unchanged += 1,
+                    sync::SyncResult::Deleted(_) => deleted += 1,
                     sync::SyncResult::Failed(_, _) => failed += 1,
                 }
             }
@@ -111,6 +113,7 @@ async fn main() -> Result<()> {
             println!("  - Added: {}", added);
             println!("  - Updated: {}", updated);
             println!("  - Unchanged: {}", unchanged);
+            println!("  - Deleted: {}", deleted);
             println!("  - Failed: {}", failed);
             println!("  - Total photos in index: {}", photo_index.photo_count());
             

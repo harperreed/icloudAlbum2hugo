@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
 use reqwest::Client;
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -26,6 +27,8 @@ pub enum SyncResult {
     Updated(String),
     /// Photo was already up to date (no changes)
     Unchanged(String),
+    /// Photo was deleted (no longer in remote album)
+    Deleted(String),
     /// Failed to sync this photo
     Failed(String, String), // (guid, error message)
 }
@@ -50,7 +53,8 @@ impl Syncer {
         index.save(&self.index_path)
     }
     
-    /// Syncs photos from the remote album to the local filesystem
+    /// Syncs photos from the remote album to the local filesystem,
+    /// adding new photos, updating changed ones, and removing deleted ones
     pub async fn sync_photos(&self, album: &Album, index: &mut PhotoIndex) -> Result<Vec<SyncResult>> {
         let mut results = Vec::new();
         
@@ -58,7 +62,27 @@ impl Syncer {
         fs::create_dir_all(&self.content_dir)
             .context("Failed to create content directory")?;
         
-        // Process each photo in the album
+        // Keep track of remote photo IDs
+        let remote_guids: HashSet<&String> = album.photos.keys().collect();
+        
+        // Find photos to delete (in index but not in remote album)
+        let photos_to_delete: Vec<_> = index.photos.keys()
+            .filter(|guid| !remote_guids.contains(guid))
+            .cloned()
+            .collect();
+        
+        // Delete photos that are no longer in the remote album
+        for guid in &photos_to_delete {
+            match self.delete_photo(guid, index) {
+                Ok(_) => results.push(SyncResult::Deleted(guid.clone())),
+                Err(e) => results.push(SyncResult::Failed(
+                    guid.clone(),
+                    format!("Failed to delete photo: {}", e)
+                )),
+            }
+        }
+        
+        // Process each photo in the album (add or update)
         for (guid, photo) in &album.photos {
             match self.sync_photo(photo, index).await {
                 Ok(result) => results.push(result),
@@ -70,6 +94,29 @@ impl Syncer {
         }
         
         Ok(results)
+    }
+    
+    /// Deletes a photo that is no longer in the remote album
+    fn delete_photo(&self, guid: &str, index: &mut PhotoIndex) -> Result<()> {
+        // Get the photo from the index
+        let photo = match index.get_photo(guid) {
+            Some(photo) => photo,
+            None => return Ok(()),  // Photo not in index, nothing to do
+        };
+        
+        // Get the directory containing the photo
+        let photo_dir = self.content_dir.join(guid);
+        
+        // Remove the directory if it exists
+        if photo_dir.exists() {
+            fs::remove_dir_all(&photo_dir)
+                .with_context(|| format!("Failed to delete directory for photo {}", guid))?;
+        }
+        
+        // Remove the photo from the index
+        index.remove_photo(guid);
+        
+        Ok(())
     }
     
     /// Syncs a single photo
@@ -241,6 +288,7 @@ mod tests {
                 SyncResult::Added(_) => added_count += 1,
                 SyncResult::Updated(_) => updated_count += 1,
                 SyncResult::Unchanged(_) => unchanged_count += 1,
+                SyncResult::Deleted(_) => panic!("Should not have deleted any photos"),
                 SyncResult::Failed(guid, error) => {
                     panic!("Photo {} failed to sync: {}", guid, error);
                 }
@@ -371,6 +419,81 @@ mod tests {
         }
         
         assert_eq!(updated_count, 2, "Expected 2 updated photos");
+        
+        Ok(())
+    }
+    
+    #[tokio::test]
+    async fn test_sync_delete_photos() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let content_dir = temp_dir.path().join("content");
+        let index_path = temp_dir.path().join("index.yaml");
+        
+        let syncer = Syncer::new(content_dir.clone(), index_path.clone());
+        
+        // Create a test index with three photos (photo1, photo2, photo3)
+        let mut index = PhotoIndex::new();
+        
+        // Add photos to the index
+        for guid in &["photo1", "photo2", "photo3"] {
+            let photo = create_test_photo(guid);
+            let photo_dir = content_dir.join(guid);
+            
+            // Create directories and placeholder files
+            fs::create_dir_all(&photo_dir)?;
+            fs::write(photo_dir.join("original.jpg"), "test content")?;
+            fs::write(photo_dir.join("index.md"), "test content")?;
+            
+            let indexed_photo = IndexedPhoto {
+                guid: photo.guid.clone(),
+                filename: photo.filename.clone(),
+                caption: photo.caption.clone(),
+                created_at: photo.created_at,
+                checksum: photo.checksum.clone(),
+                url: photo.url.clone(),
+                width: photo.width,
+                height: photo.height,
+                last_sync: Utc::now(),
+                local_path: photo_dir.join("original.jpg"),
+            };
+            
+            index.add_or_update_photo(indexed_photo);
+        }
+        
+        // Verify initial state
+        assert_eq!(index.photo_count(), 3);
+        assert!(content_dir.join("photo1").exists());
+        assert!(content_dir.join("photo2").exists());
+        assert!(content_dir.join("photo3").exists());
+        
+        // Create a test album with only two photos (photo1, photo2)
+        // so photo3 should be deleted
+        let album = create_test_album(); // Creates only photo1 and photo2
+        
+        // Sync the photos
+        let results = syncer.sync_photos(&album, &mut index).await?;
+        
+        // Count deleted photos
+        let mut deleted_count = 0;
+        for result in &results {
+            if let SyncResult::Deleted(guid) = result {
+                deleted_count += 1;
+                assert_eq!(guid, "photo3", "Expected photo3 to be deleted");
+            }
+        }
+        
+        assert_eq!(deleted_count, 1, "Expected 1 deleted photo");
+        assert_eq!(index.photo_count(), 2, "Expected 2 photos left in index");
+        
+        // Verify photo3 directory was deleted
+        assert!(content_dir.join("photo1").exists());
+        assert!(content_dir.join("photo2").exists());
+        assert!(!content_dir.join("photo3").exists());
+        
+        // Verify photo3 was removed from the index
+        assert!(index.get_photo("photo1").is_some());
+        assert!(index.get_photo("photo2").is_some());
+        assert!(index.get_photo("photo3").is_none());
         
         Ok(())
     }
