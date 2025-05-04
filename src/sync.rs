@@ -235,7 +235,17 @@ impl Syncer {
     
     /// Creates an index.md file with frontmatter including EXIF data
     fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
-        let title = photo.caption.clone().unwrap_or_else(|| photo.filename.clone());
+        // Get the date to use for display - prefer EXIF date if available, fallback to creation date
+        let display_date = photo.exif_date_time.unwrap_or(photo.created_at);
+        
+        // Format a nice human-readable date for the title (January 1, 2023)
+        let formatted_date = display_date.format("%B %e, %Y").to_string();
+        
+        // If there's no caption, use "Photo taken on <formatted_date>"
+        let title = match &photo.caption {
+            Some(caption) if !caption.trim().is_empty() => caption.clone(),
+            _ => format!("Photo taken on {}", formatted_date)
+        };
         
         // Build the frontmatter with EXIF data if available
         let mut frontmatter = format!(
@@ -348,11 +358,37 @@ mod tests {
         }
     }
     
+    // Create a test photo with no caption
+    fn create_test_photo_no_caption(guid: &str) -> Photo {
+        Photo {
+            guid: guid.to_string(),
+            filename: format!("{}.jpg", guid),
+            caption: None,
+            created_at: Utc::now(),
+            checksum: format!("checksum_{}", guid),
+            url: format!("https://example.com/{}.jpg", guid),
+            width: 800,
+            height: 600,
+        }
+    }
+    
     fn create_test_album() -> Album {
         let mut album = Album::new("Test Album".to_string());
         
         let photo1 = create_test_photo("photo1");
         let photo2 = create_test_photo("photo2");
+        
+        album.photos.insert(photo1.guid.clone(), photo1);
+        album.photos.insert(photo2.guid.clone(), photo2);
+        
+        album
+    }
+    
+    fn create_test_album_with_no_captions() -> Album {
+        let mut album = Album::new("Test Album".to_string());
+        
+        let photo1 = create_test_photo_no_caption("photo1");
+        let photo2 = create_test_photo("photo2"); // Mix of with and without captions
         
         album.photos.insert(photo1.guid.clone(), photo1);
         album.photos.insert(photo2.guid.clone(), photo2);
@@ -592,6 +628,45 @@ mod tests {
         assert!(index.get_photo("photo1").is_some());
         assert!(index.get_photo("photo2").is_some());
         assert!(index.get_photo("photo3").is_none());
+        
+        Ok(())
+    }
+    
+    #[tokio::test]
+    async fn test_photo_title_formatting() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let content_dir = temp_dir.path().join("content");
+        let index_path = temp_dir.path().join("index.yaml");
+        
+        let syncer = Syncer::new(content_dir.clone(), index_path.clone());
+        
+        // Start with an empty index
+        let mut index = PhotoIndex::new();
+        
+        // Create a test album with one photo with caption and one without
+        let album = create_test_album_with_no_captions();
+        
+        // Sync the photos
+        syncer.sync_photos(&album, &mut index).await?;
+        
+        // Read the generated index.md files to check their titles
+        let photo1_index_path = content_dir.join("photo1").join("index.md");
+        let photo2_index_path = content_dir.join("photo2").join("index.md");
+        
+        assert!(photo1_index_path.exists(), "index.md for photo1 should exist");
+        assert!(photo2_index_path.exists(), "index.md for photo2 should exist");
+        
+        // Read the contents
+        let photo1_content = fs::read_to_string(photo1_index_path)?;
+        let photo2_content = fs::read_to_string(photo2_index_path)?;
+        
+        // Check that photo1 (no caption) has a title with "Photo taken on" format
+        assert!(photo1_content.contains("title: Photo taken on"), 
+              "Photo without caption should have title with 'Photo taken on' format");
+        
+        // Check that photo2 (with caption) has the caption as title
+        assert!(photo2_content.contains("title: Caption for photo2"), 
+              "Photo with caption should use the caption as title");
         
         Ok(())
     }
