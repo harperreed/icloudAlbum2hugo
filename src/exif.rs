@@ -15,6 +15,7 @@ use std::io::BufReader;
 use std::path::Path;
 use chrono::{DateTime, TimeZone, Utc};
 use rand::Rng;
+use log::{debug, warn};
 
 /// Represents the extracted EXIF metadata from a photo
 #[derive(Debug, Clone, Default)]
@@ -59,7 +60,7 @@ pub fn extract_exif(image_path: &Path) -> Result<ExifMetadata> {
         Ok(exif) => exif,
         Err(e) => {
             // Log the error but return default metadata
-            eprintln!("Warning: Could not extract EXIF data from {}: {}", image_path.display(), e);
+            warn!("Could not extract EXIF data from {}: {}", image_path.display(), e);
             return Ok(metadata);
         }
     };

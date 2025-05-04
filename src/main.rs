@@ -31,7 +31,33 @@ use std::fs;
 use config::Config;
 use sync::Syncer;
 use icloud::fetch_album;
-use log::{info, debug};
+use log::{info, debug, warn, error};
+
+// Helper function to both log a message and print it to the console for user feedback
+fn console_log(message: &str, level: log::Level) {
+    match level {
+        log::Level::Error => {
+            error!("{}", message);
+            println!("❌ {}", message);
+        },
+        log::Level::Warn => {
+            warn!("{}", message);
+            println!("⚠️  {}", message);
+        },
+        log::Level::Info => {
+            info!("{}", message);
+            println!("{}", message);
+        },
+        log::Level::Debug => {
+            debug!("{}", message);
+            // No console output for debug messages
+        },
+        log::Level::Trace => {
+            log::trace!("{}", message);
+            // No console output for trace messages
+        },
+    }
+}
 
 #[derive(Parser)]
 #[command(author, version, about = "A tool to sync photos from iCloud Shared Albums to Hugo")]
@@ -363,25 +389,27 @@ fn init_config(config_path_opt: &Option<PathBuf>, force: bool) -> Result<()> {
     let config_path = Config::get_config_path(config_path_opt);
     
     if config_path.exists() && !force {
-        println!("📋 Config file already exists at {}", config_path.display());
-        println!("   Use --force to overwrite");
+        console_log(&format!("📋 Config file already exists at {}", config_path.display()), log::Level::Info);
+        console_log("   Use --force to overwrite", log::Level::Info);
         return Ok(());
     }
     
     // Ensure parent directory exists
     if let Some(parent) = config_path.parent() {
         if !parent.as_os_str().is_empty() && !parent.exists() {
+            debug!("Creating parent directory: {}", parent.display());
             fs::create_dir_all(parent)
                 .with_context(|| format!("Failed to create directory {}", parent.display()))?;
         }
     }
     
     let config = Config::default();
+    debug!("Saving default configuration to {}", config_path.display());
     config.save_to_file(&config_path)
         .with_context(|| format!("Failed to write config to {}", config_path.display()))?;
     
-    println!("✅ Created config file at {}", config_path.display());
-    println!("   Please edit this file to set your iCloud shared album URL");
+    console_log(&format!("✅ Created config file at {}", config_path.display()), log::Level::Info);
+    console_log("   Please edit this file to set your iCloud shared album URL", log::Level::Info);
     Ok(())
 }
 

@@ -15,6 +15,7 @@ use reqwest::Client;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::fs as tokio_fs;
+use log::{debug, info, warn, error};
 
 use crate::icloud::{Album, Photo};
 use crate::index::{PhotoIndex, IndexedPhoto};
@@ -177,14 +178,14 @@ impl Syncer {
                                 indexed_photo.update_location(location);
                             }
                             Err(e) => {
-                                eprintln!("Warning: Failed to geocode location for {}: {}", photo.guid, e);
+                                warn!("Failed to geocode location for {}: {}", photo.guid, e);
                                 // Continue without location data
                             }
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("Warning: Failed to extract EXIF data from {}: {}", photo.guid, e);
+                    warn!("Failed to extract EXIF data from {}: {}", photo.guid, e);
                     // Continue without EXIF data
                 }
             }
