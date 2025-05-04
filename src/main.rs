@@ -1,9 +1,12 @@
 mod config;
+mod icloud;
+mod api_debug;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use config::Config;
+use api_debug::debug_album_api;
 
 #[derive(Parser)]
 #[command(author, version, about = "A tool to sync photos from iCloud to Hugo")]
@@ -55,6 +58,15 @@ async fn main() -> Result<()> {
             println!("Album URL: {}", config_data.album_url);
             println!("Output directory: {}", config_data.out_dir);
             println!("Data file: {}", config_data.data_file);
+            
+            // Debug the API to understand its structure
+            println!("Debugging album API...");
+            debug_album_api(&config_data.album_url).await
+                .context("Failed to debug album API")?;
+            
+            // Fetch the album data (temporarily disabled until we fix the implementation)
+            println!("Note: Full implementation temporarily disabled while we explore the API");
+            
             Ok(())
         }
         Commands::Status { config } => {
@@ -63,6 +75,15 @@ async fn main() -> Result<()> {
             println!("Album URL: {}", config_data.album_url);
             println!("Output directory: {}", config_data.out_dir);
             println!("Data file: {}", config_data.data_file);
+            
+            // Use the debug function
+            println!("Using debug function to get album data...");
+            debug_album_api(&config_data.album_url).await
+                .context("Failed to debug album API")?;
+                
+            println!("Remote status obtained");
+            println!("Local index not implemented yet");
+            
             Ok(())
         }
     }

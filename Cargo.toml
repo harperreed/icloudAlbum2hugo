@@ -11,6 +11,10 @@ serde_yaml = "0.9"
 serde_json = "1.0"
 reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
+icloud-album-rs = "0.1.0"
+url = "2.5"
+mockito = "1.3"
+chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"

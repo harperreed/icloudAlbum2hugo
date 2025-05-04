@@ -1,0 +1,3 @@
+Mock Album data:
+  Album URL: https://www.icloud.com/sharedalbum/#custom123
+  Photos count: 3
