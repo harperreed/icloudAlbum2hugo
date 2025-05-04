@@ -352,6 +352,7 @@ height: {}
 mod tests {
     use super::*;
     use chrono::Utc;
+    use std::fs; // Import std::fs for testing
     use std::path::PathBuf;
     use tempfile::tempdir;
     
