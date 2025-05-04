@@ -277,12 +277,25 @@ impl std::error::Error for ICloudError {
     }
 }
 
+/// Helper function to extract information from a derivative
+fn extract_derivative_info(
+    key: &str, 
+    derivative: &icloud_album_rs::models::ImageDerivative
+) -> Option<(String, u32, u32)> {
+    derivative.url.as_ref().map(|url| {
+        let width = derivative.width.unwrap_or(0) as u32;
+        let height = derivative.height.unwrap_or(0) as u32;
+        (url.clone(), width, height)
+    })
+}
+
 /// Find best available derivative for a photo
 /// 
 /// Strategy:
 /// 1. First try to find the "original" derivative for full resolution
 /// 2. If original is not available, try to find a "large" derivative
-/// 3. If neither is available, take the first derivative with a URL
+/// 3. If that fails, try to find a "medium" derivative
+/// 4. If all else fails, take any derivative with a URL
 /// 
 /// Returns a tuple of (url, width, height) or an error if no suitable derivative is found
 fn find_best_derivative(
@@ -299,65 +312,34 @@ fn find_best_derivative(
         }
     }
     
-    // First attempt: find "original" derivative
-    let original = photo.derivatives.iter()
-        .find(|(key, derivative)| {
-            key.contains("original") && derivative.url.is_some()
-        });
+    // Define the priority order of derivative types to try
+    let derivative_types = ["original", "large", "medium"];
     
-    if let Some((key, derivative)) = original {
-        debug!("Found original derivative: {}", key);
-        if let Some(url) = &derivative.url {
-            let width = derivative.width.unwrap_or(0) as u32;
-            let height = derivative.height.unwrap_or(0) as u32;
-            return Ok((url.clone(), width, height));
-        }
-    }
-    
-    // Second attempt: try to find "large" derivative
-    debug!("No original derivative found, looking for large derivative");
-    let large = photo.derivatives.iter()
-        .find(|(key, derivative)| {
-            key.contains("large") && derivative.url.is_some()
-        });
-    
-    if let Some((key, derivative)) = large {
-        debug!("Found large derivative: {}", key);
-        if let Some(url) = &derivative.url {
-            let width = derivative.width.unwrap_or(0) as u32;
-            let height = derivative.height.unwrap_or(0) as u32;
-            return Ok((url.clone(), width, height));
-        }
-    }
-    
-    // Third attempt: try to find "medium" derivative
-    debug!("No large derivative found, looking for medium derivative");
-    let medium = photo.derivatives.iter()
-        .find(|(key, derivative)| {
-            key.contains("medium") && derivative.url.is_some()
-        });
-    
-    if let Some((key, derivative)) = medium {
-        debug!("Found medium derivative: {}", key);
-        if let Some(url) = &derivative.url {
-            let width = derivative.width.unwrap_or(0) as u32;
-            let height = derivative.height.unwrap_or(0) as u32;
-            return Ok((url.clone(), width, height));
+    // Try each derivative type in order of preference
+    for derivative_type in &derivative_types {
+        debug!("Looking for '{}' derivative", derivative_type);
+        
+        if let Some((key, derivative)) = photo.derivatives.iter()
+            .find(|(key, derivative)| {
+                key.contains(derivative_type) && derivative.url.is_some()
+            }) 
+        {
+            debug!("Found {} derivative: {}", derivative_type, key);
+            if let Some(result) = extract_derivative_info(key, derivative) {
+                return Ok(result);
+            }
         }
     }
     
     // Last resort: take any derivative with a URL
-    debug!("No medium derivative found, looking for any derivative with a URL");
-    let any_derivative = photo.derivatives.iter()
-        .find(|(_, derivative)| derivative.url.is_some());
-    
-    if let Some((key, derivative)) = any_derivative {
+    debug!("No preferred derivatives found, looking for any derivative with a URL");
+    if let Some((key, derivative)) = photo.derivatives.iter()
+        .find(|(_, derivative)| derivative.url.is_some())
+    {
         debug!("Found fallback derivative: {}", key);
-        if let Some(url) = &derivative.url {
-            let width = derivative.width.unwrap_or(0) as u32;
-            let height = derivative.height.unwrap_or(0) as u32;
+        if let Some(result) = extract_derivative_info(key, derivative) {
             warn!("Using fallback derivative {} for photo {}", key, photo.photo_guid);
-            return Ok((url.clone(), width, height));
+            return Ok(result);
         }
     }
     
@@ -475,6 +457,27 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
     Ok(album)
 }
 
+/// Parse a date string in RFC3339 format to a UTC DateTime
+fn parse_photo_date(date_str: &str) -> Result<DateTime<Utc>, ICloudError> {
+    debug!("Parsing date: {}", date_str);
+    
+    DateTime::parse_from_rfc3339(date_str)
+        .map(|dt| dt.with_timezone(&Utc))
+        .map_err(|e| {
+            warn!("Failed to parse date '{}': {}", date_str, e);
+            ICloudError::PhotoProcessingError(
+                format!("Failed to parse date {}: {}", date_str, e)
+            )
+        })
+}
+
+/// Generate a checksum for a photo based on its GUID and URL
+fn generate_photo_checksum(guid: &str, url: &str) -> String {
+    let checksum = format!("{:x}", md5::compute(format!("{}:{}", guid, url)));
+    trace!("Generated checksum: {}", checksum);
+    checksum
+}
+
 /// Process a single photo from the iCloud API response and add it to the album
 fn process_photo(
     album: &mut Album,
@@ -487,39 +490,20 @@ fn process_photo(
     let (url, width, height) = find_best_derivative(&photo)?;
     debug!("Found best derivative: width={}, height={}", width, height);
     
-    // Parse the created date
-    let created_at = match photo.date_created {
-        Some(created) => {
-            debug!("Parsing date: {}", created);
-            // Parse into DateTime<Utc>
-            match DateTime::parse_from_rfc3339(&created) {
-                Ok(dt) => {
-                    let utc_dt = dt.with_timezone(&Utc);
-                    debug!("Parsed date as UTC: {}", utc_dt);
-                    utc_dt
-                },
-                Err(e) => {
-                    warn!("Failed to parse date '{}': {}", created, e);
-                    return Err(ICloudError::PhotoProcessingError(
-                        format!("Failed to parse date {}: {}", created, e)
-                    ));
-                }
-            }
-        },
+    // Parse the created date or use current time as fallback
+    let created_at = match &photo.date_created {
+        Some(date_str) => parse_photo_date(date_str)?,
         None => {
             let now = Utc::now();
             debug!("No date found, using current time: {}", now);
-            now // Default to current time if not available
+            now
         }
     };
     
-    // Create a checksum based on the photo GUID and URL
-    // In a real-world scenario, we might want to compute an actual checksum of the image data
-    let checksum = format!("{:x}", md5::compute(format!("{}:{}", photo.photo_guid, url)));
-    trace!("Generated checksum: {}", checksum);
-    
-    // Create our Photo struct
+    // Create a checksum and build the photo object
     let guid = photo.photo_guid.clone();
+    let checksum = generate_photo_checksum(&guid, &url);
+    
     let icloud_photo = Photo {
         guid: photo.photo_guid,
         filename: format!("{}.jpg", guid), // Assuming JPG format
