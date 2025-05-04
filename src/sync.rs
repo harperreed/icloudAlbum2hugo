@@ -13,7 +13,6 @@
 use anyhow::{Context, Result};
 use reqwest::Client;
 use std::collections::HashSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 use tokio::fs as tokio_fs;
 
