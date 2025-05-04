@@ -201,7 +201,7 @@ fuzz_meters: 100.0
 
         let stdout = String::from_utf8(output.get_output().stdout.clone())?;
         assert!(
-            stdout.contains("icloud2hugo Status"),
+            stdout.contains("icloudAlbum2hugo Status"),
             "Should show status header"
         );
         assert!(
