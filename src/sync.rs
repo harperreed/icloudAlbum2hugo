@@ -344,10 +344,25 @@ impl Syncer {
         let mut futures = Vec::new();
         let results = Arc::new(Mutex::new(Vec::new()));
         
-        // Create a vec of photos to process to avoid borrowing issues
-        let photos_to_process: Vec<_> = album.photos.values().cloned().collect();
+        // First, check which photos are unchanged to avoid processing them
+        let mut unchanged_photos = Vec::new();
+        let mut photos_to_process = Vec::new();
         
-        // Create tasks for each photo
+        for (guid, photo) in &album.photos {
+            // Check if the photo exists and has the same checksum
+            if let Some(existing) = index.get_photo(guid) {
+                if existing.checksum == photo.checksum {
+                    // This photo is unchanged, don't need to process it
+                    unchanged_photos.push(SyncResult::Unchanged(guid.clone()));
+                    continue;
+                }
+            }
+            
+            // This photo needs processing (new or updated)
+            photos_to_process.push(photo.clone());
+        }
+        
+        // Create tasks for each photo that needs processing
         for photo in photos_to_process {
             let guid = photo.guid.clone();
             let content_dir = self.content_dir.clone();
@@ -360,9 +375,6 @@ impl Syncer {
                     client,
                     content_dir: content_dir.clone(),
                 };
-                
-                // Determine if this is a new photo
-                let is_new = true; // We'll set the actual value based on results
                 
                 // Sync photo in the task
                 let result = Self::sync_photo_task_v2(&photo, &task_syncer).await;
@@ -399,6 +411,9 @@ impl Syncer {
             .expect("Failed to get inner mutex value");
         
         let mut final_results = Vec::new();
+        
+        // Add all the unchanged photos to the results
+        final_results.extend(unchanged_photos);
         
         // Update the index with successful results and collect final results
         for (indexed_photo_result, status_or_guid) in task_results {
