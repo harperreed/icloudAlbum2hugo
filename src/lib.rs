@@ -1,3 +1,30 @@
+//! # icloud2hugo
+//! 
+//! A command-line tool that syncs photos from iCloud Shared Albums to a Hugo site.
+//! 
+//! This tool fetches photos from a shared iCloud album, extracts EXIF data,
+//! performs reverse geocoding (when location data is available), and organizes everything
+//! into Hugo page bundles under `content/photostream/<photo_id>/`.
+//!
+//! ## Features
+//!
+//! - Downloads new/updated photos at full resolution
+//! - Removes photos that no longer exist in the album
+//! - Extracts EXIF metadata (camera info, date/time, location)
+//! - Reverse geocoding and location fuzzing for privacy
+//! - Creates Hugo page bundles with proper frontmatter
+//! - Maintains a master YAML index file
+
+// Export modules for integration testing
+pub mod config;
+pub mod icloud;
+pub mod api_debug;
+pub mod index;
+pub mod sync;
+pub mod mock;
+pub mod exif;
+pub mod geocode;
+
 #[cfg(test)]
 mod tests {
     use assert_cmd::Command;
