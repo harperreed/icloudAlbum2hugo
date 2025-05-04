@@ -9,6 +9,20 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+// Define constants for default configuration values for clarity and reusability
+const DEFAULT_ALBUM_URL: &str = "https://www.icloud.com/sharedalbum/ALBUM_TOKEN_GOES_HERE";
+const DEFAULT_OUT_DIR: &str = "content/photostream"; 
+const DEFAULT_DATA_FILE: &str = "data/photos/index.yaml";
+const DEFAULT_FUZZ_METERS: f64 = 100.0;
+
+// Define separate constants for test data - explicitly for testing only
+#[cfg(test)]
+pub(crate) mod test_constants {
+    pub const TEST_ALBUM_TOKEN: &str = "B0T3STt0k3n123456";
+    pub const TEST_ALBUM_URL: &str = "https://www.icloud.com/sharedalbum/#B0T3STt0k3n123456";
+    pub const TEST_MOCK_DIRECTORY: &str = "custom/tests";
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub album_url: String,
@@ -20,10 +34,10 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            album_url: "https://www.icloud.com/sharedalbum/#...".to_string(),
-            out_dir: "content/photostream".to_string(),
-            data_file: "data/photos/index.yaml".to_string(),
-            fuzz_meters: Some(100.0),
+            album_url: DEFAULT_ALBUM_URL.to_string(),
+            out_dir: DEFAULT_OUT_DIR.to_string(),
+            data_file: DEFAULT_DATA_FILE.to_string(),
+            fuzz_meters: Some(DEFAULT_FUZZ_METERS),
         }
     }
 }
@@ -69,10 +83,10 @@ mod tests {
     fn test_default_config() {
         let config = Config::default();
         
-        assert_eq!(config.album_url, "https://www.icloud.com/sharedalbum/#...");
-        assert_eq!(config.out_dir, "content/photostream");
-        assert_eq!(config.data_file, "data/photos/index.yaml");
-        assert_eq!(config.fuzz_meters, Some(100.0));
+        assert_eq!(config.album_url, DEFAULT_ALBUM_URL);
+        assert_eq!(config.out_dir, DEFAULT_OUT_DIR);
+        assert_eq!(config.data_file, DEFAULT_DATA_FILE);
+        assert_eq!(config.fuzz_meters, Some(DEFAULT_FUZZ_METERS));
     }
 
     #[test]

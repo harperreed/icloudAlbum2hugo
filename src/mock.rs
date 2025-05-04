@@ -2,9 +2,14 @@ use anyhow::Result;
 use chrono::Utc;
 use crate::icloud::{Album, Photo};
 
+// Test data constants for mock content
+const MOCK_ALBUM_NAME: &str = "Mock Test Album";
+const MOCK_URL_PREFIX: &str = "https://test.example/";
+const MOCK_CHECKSUM_PREFIX: &str = "mock_checksum_";
+
 /// Creates a mock album for testing
 pub fn create_mock_album() -> Result<Album> {
-    let mut album = Album::new("Mock Test Album".to_string());
+    let mut album = Album::new(MOCK_ALBUM_NAME.to_string());
     
     // Add a few test photos
     album.photos.insert("mock1".to_string(), Photo {
@@ -12,8 +17,8 @@ pub fn create_mock_album() -> Result<Album> {
         filename: "mock1.jpg".to_string(),
         caption: Some("Mock Photo 1".to_string()),
         created_at: Utc::now(),
-        checksum: "mock_checksum_1".to_string(),
-        url: "https://example.com/mock1.jpg".to_string(),
+        checksum: format!("{}{}", MOCK_CHECKSUM_PREFIX, "1"),
+        url: format!("{}mock1.jpg", MOCK_URL_PREFIX),
         width: 1200,
         height: 800,
     });
@@ -23,8 +28,8 @@ pub fn create_mock_album() -> Result<Album> {
         filename: "mock2.jpg".to_string(),
         caption: None,
         created_at: Utc::now(),
-        checksum: "mock_checksum_2".to_string(),
-        url: "https://example.com/mock2.jpg".to_string(),
+        checksum: format!("{}{}", MOCK_CHECKSUM_PREFIX, "2"),
+        url: format!("{}mock2.jpg", MOCK_URL_PREFIX),
         width: 1920,
         height: 1080,
     });
@@ -34,8 +39,8 @@ pub fn create_mock_album() -> Result<Album> {
         filename: "photo_with_no_caption.jpg".to_string(),
         caption: None,
         created_at: Utc::now(),
-        checksum: "mock_checksum_3".to_string(),
-        url: "https://example.com/mock3.jpg".to_string(),
+        checksum: format!("{}{}", MOCK_CHECKSUM_PREFIX, "3"),
+        url: format!("{}mock3.jpg", MOCK_URL_PREFIX),
         width: 800,
         height: 600,
     });
@@ -43,13 +48,16 @@ pub fn create_mock_album() -> Result<Album> {
     Ok(album)
 }
 
+// Constants for test URL identification
+const TEST_URL_INDICATORS: [&str; 3] = ["test", "example", "custom"];
+
 /// Simulates fetching an album from a URL.
 /// For test URLs, returns a mock album.
 pub async fn mock_fetch_album(album_url: &str) -> Result<Album> {
-    if album_url.contains("test") || 
-       album_url.contains("example") || 
-       album_url.contains("custom") ||
-       cfg!(test) {
+    // Check if any of our test indicators are in the URL, or if we're in test mode
+    let is_test_url = TEST_URL_INDICATORS.iter().any(|indicator| album_url.contains(indicator)) || cfg!(test);
+    
+    if is_test_url {
         return create_mock_album();
     }
     

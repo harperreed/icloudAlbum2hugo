@@ -329,10 +329,12 @@ fn find_best_derivative(
 pub async fn fetch_album(album_url: &str) -> Result<Album> {
     info!("Fetching iCloud shared album: {}", album_url);
     
+    // Define test token indicators explicitly
+    const TEST_TOKEN_INDICATORS: [&str; 3] = ["#test", "#custom", "#example"];
+    
     // Special handling for test or custom URLs
-    if album_url.contains("#test") || 
-       album_url.contains("#custom") || 
-       album_url.contains("#example") {
+    let is_test_url = TEST_TOKEN_INDICATORS.iter().any(|indicator| album_url.contains(indicator));
+    if is_test_url {
         debug!("Detected test URL, using mock album data");
         return crate::mock::create_mock_album();
     }
