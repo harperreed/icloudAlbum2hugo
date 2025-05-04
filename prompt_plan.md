@@ -361,7 +361,7 @@ Now add EXIF data extraction.
 5. Ensure the date/time is stored as a valid Hugo date in frontmatter.
 ```
 
-### Prompt 8: Reverse Geocode & Fuzz
+### Prompt 8: Reverse Geocode & Fuzz (COMPLETED)
 
 ```
 Implement location metadata:

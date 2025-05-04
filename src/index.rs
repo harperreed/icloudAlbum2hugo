@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::geocode::Location;
+
 /// Represents a stored photo's metadata in our local index
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexedPhoto {
@@ -52,6 +54,10 @@ pub struct IndexedPhoto {
     pub f_number: Option<f32>,
     /// Focal length in mm
     pub focal_length: Option<f32>,
+    
+    // Location information from geocoding
+    /// Formatted location address (e.g., "Chicago, IL, USA")
+    pub location: Option<Location>,
 }
 
 /// Represents our local database of photos
@@ -98,6 +104,7 @@ impl IndexedPhoto {
             exposure_time: None,
             f_number: None,
             focal_length: None,
+            location: None,
         }
     }
     
@@ -114,6 +121,11 @@ impl IndexedPhoto {
         self.exposure_time = exif.exposure_time.clone();
         self.f_number = exif.f_number;
         self.focal_length = exif.focal_length;
+    }
+    
+    /// Update this photo with location data from geocoding
+    pub fn update_location(&mut self, location: crate::geocode::Location) {
+        self.location = Some(location);
     }
 }
 

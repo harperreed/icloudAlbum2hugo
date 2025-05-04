@@ -5,6 +5,7 @@ mod index;
 mod sync;
 mod mock;
 mod exif;
+mod geocode;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};

@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use crate::icloud::{Album, Photo};
 use crate::index::{PhotoIndex, IndexedPhoto};
 use crate::exif::{extract_exif, ExifMetadata};
+use crate::geocode::{GeocodingService, create_geocoding_service};
 
 /// Responsible for syncing photos from iCloud to the local filesystem
 pub struct Syncer {
@@ -160,6 +161,21 @@ impl Syncer {
                 Ok(exif_data) => {
                     // Update indexed photo with EXIF metadata
                     indexed_photo.update_exif(&exif_data);
+                    
+                    // If GPS coordinates are available, perform reverse geocoding
+                    if let (Some(lat), Some(lon)) = (indexed_photo.latitude, indexed_photo.longitude) {
+                        let geocoding_service = create_geocoding_service();
+                        match geocoding_service.reverse_geocode(lat, lon) {
+                            Ok(location) => {
+                                // Update the photo with location data
+                                indexed_photo.update_location(location);
+                            }
+                            Err(e) => {
+                                eprintln!("Warning: Failed to geocode location for {}: {}", photo.guid, e);
+                                // Continue without location data
+                            }
+                        }
+                    }
                 }
                 Err(e) => {
                     eprintln!("Warning: Failed to extract EXIF data from {}: {}", photo.guid, e);
@@ -306,6 +322,23 @@ height: {}
         
         if let Some(focal) = photo.focal_length {
             frontmatter.push_str(&format!("focal_length: {:.1}\n", focal));
+        }
+        
+        // Add location data if available
+        if let Some(ref location) = photo.location {
+            frontmatter.push_str(&format!("location: {}\n", location.formatted_address));
+            
+            if let Some(ref city) = location.city {
+                frontmatter.push_str(&format!("city: {}\n", city));
+            }
+            
+            if let Some(ref state) = location.state {
+                frontmatter.push_str(&format!("state: {}\n", state));
+            }
+            
+            if let Some(ref country) = location.country {
+                frontmatter.push_str(&format!("country: {}\n", country));
+            }
         }
         
         // Close frontmatter and add content
