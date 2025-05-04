@@ -303,10 +303,11 @@ fn extract_derivative_info(
 /// Find best available derivative for a photo
 ///
 /// Strategy:
-/// 1. First try to find the "original" derivative for full resolution
-/// 2. If original is not available, try to find a "large" derivative
-/// 3. If that fails, try to find a "medium" derivative
-/// 4. If all else fails, take any derivative with a URL
+/// 1. First try to find the "original" derivative as it typically offers the highest quality
+/// 2. If original is not available, select the derivative with the highest resolution (width × height)
+///
+/// This ensures we always get the highest quality image available, regardless of the derivative name.
+/// Note: It's normal for iCloud to provide different derivative types for different photos.
 ///
 /// Returns a tuple of (url, width, height) or an error if no suitable derivative is found
 fn find_best_derivative(
@@ -328,39 +329,53 @@ fn find_best_derivative(
         }
     }
 
-    // Define the priority order of derivative types to try
-    let derivative_types = ["original", "large", "medium"];
-
-    // Try each derivative type in order of preference
-    for derivative_type in &derivative_types {
-        debug!("Looking for '{}' derivative", derivative_type);
-
-        if let Some((key, derivative)) = photo
-            .derivatives
-            .iter()
-            .find(|(key, derivative)| key.contains(derivative_type) && derivative.url.is_some())
-        {
-            debug!("Found {} derivative: {}", derivative_type, key);
-            if let Some(result) = extract_derivative_info(key, derivative) {
-                return Ok(result);
-            }
-        }
-    }
-
-    // Last resort: take any derivative with a URL
-    debug!("No preferred derivatives found, looking for any derivative with a URL");
+    // First try to find the original derivative as it's typically the highest quality
     if let Some((key, derivative)) = photo
         .derivatives
         .iter()
-        .find(|(_, derivative)| derivative.url.is_some())
+        .find(|(key, derivative)| key.contains("original") && derivative.url.is_some())
     {
-        debug!("Found fallback derivative: {}", key);
+        debug!("Found original derivative: {}", key);
         if let Some(result) = extract_derivative_info(key, derivative) {
-            warn!(
-                "Using fallback derivative {} for photo {}",
-                key, photo.photo_guid
-            );
             return Ok(result);
+        }
+    }
+
+    // If original not found, select the derivative with highest resolution (width × height)
+    let mut best_derivative: Option<(&String, &icloud_album_rs::models::Derivative, u64)> = None;
+
+    for (key, derivative) in photo.derivatives.iter() {
+        // Skip derivatives without a URL
+        if derivative.url.is_none() {
+            continue;
+        }
+
+        // Get width and height, defaulting to 0 if missing
+        let width = derivative.width.unwrap_or(0);
+        let height = derivative.height.unwrap_or(0);
+
+        // Calculate resolution (width × height)
+        let resolution = width as u64 * height as u64;
+
+        // Update best_derivative if this one has higher resolution
+        match best_derivative {
+            None => best_derivative = Some((key, derivative, resolution)),
+            Some((_, _, best_res)) if resolution > best_res => {
+                best_derivative = Some((key, derivative, resolution));
+            }
+            _ => {}
+        }
+    }
+
+    // Use the highest resolution derivative if found
+    if let Some((key, derivative, resolution)) = best_derivative {
+        let result = extract_derivative_info(key, derivative);
+        if let Some((url, width, height)) = result {
+            info!(
+                "Selected highest resolution derivative: {} ({}×{} = {} pixels) for photo {}",
+                key, width, height, resolution, photo.photo_guid
+            );
+            return Ok((url, width, height));
         }
     }
 
