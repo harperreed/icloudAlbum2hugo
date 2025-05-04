@@ -318,7 +318,7 @@ Now implement a function to fetch and parse the iCloud shared album JSON.
 5. Integrate a minimal call in `sync` to load config, fetch JSON, and print out the results (so we know it works).
 ```
 
-### Prompt 4: Local Data Structure (index.yaml)
+### Prompt 4: Local Data Structure (index.yaml) (COMPLETED)
 
 ```
 We need to store a local index of photos.

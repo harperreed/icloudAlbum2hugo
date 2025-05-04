@@ -1,6 +1,7 @@
 mod config;
 mod icloud;
 mod api_debug;
+mod index;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -59,13 +60,31 @@ async fn main() -> Result<()> {
             println!("Output directory: {}", config_data.out_dir);
             println!("Data file: {}", config_data.data_file);
             
+            // Load or create the photo index
+            let data_file_path = PathBuf::from(&config_data.data_file);
+            println!("Loading photo index from {}...", data_file_path.display());
+            let photo_index = index::PhotoIndex::load(&data_file_path)
+                .context("Failed to load photo index")?;
+            
+            println!("Photo index loaded with {} photos", photo_index.photo_count());
+            
             // Debug the API to understand its structure
             println!("Debugging album API...");
             debug_album_api(&config_data.album_url).await
                 .context("Failed to debug album API")?;
             
-            // Fetch the album data (temporarily disabled until we fix the implementation)
-            println!("Note: Full implementation temporarily disabled while we explore the API");
+            // For now, we'll just save the index back (no changes yet)
+            // In a real implementation, we would:
+            // 1. Fetch the album data
+            // 2. Compare with local index
+            // 3. Download new/updated photos
+            // 4. Remove deleted photos
+            // 5. Update the index
+            println!("Saving photo index to {}...", data_file_path.display());
+            photo_index.save(&data_file_path)
+                .context("Failed to save photo index")?;
+            
+            println!("Sync completed successfully");
             
             Ok(())
         }
@@ -76,13 +95,29 @@ async fn main() -> Result<()> {
             println!("Output directory: {}", config_data.out_dir);
             println!("Data file: {}", config_data.data_file);
             
-            // Use the debug function
+            // Load or create the photo index
+            let data_file_path = PathBuf::from(&config_data.data_file);
+            println!("Loading photo index from {}...", data_file_path.display());
+            let photo_index = match index::PhotoIndex::load(&data_file_path) {
+                Ok(index) => index,
+                Err(err) => {
+                    println!("Warning: Could not load photo index: {}", err);
+                    println!("Using empty index instead");
+                    index::PhotoIndex::new()
+                }
+            };
+            
+            println!("Local photos in index: {}", photo_index.photo_count());
+            
+            // Use the debug function to get remote album data
             println!("Using debug function to get album data...");
             debug_album_api(&config_data.album_url).await
                 .context("Failed to debug album API")?;
-                
-            println!("Remote status obtained");
-            println!("Local index not implemented yet");
+            
+            println!("\nStatus summary:");
+            println!("  Local photos in index: {}", photo_index.photo_count());
+            println!("  Last updated: {}", photo_index.last_updated);
+            println!("  Remote status: See album_data_debug.txt for details");
             
             Ok(())
         }
