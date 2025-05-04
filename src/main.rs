@@ -232,7 +232,7 @@ async fn main() -> Result<()> {
                         let gallery_syncer = GallerySyncer::new(
                             content_dir,
                             output_config.name.clone(),
-                            output_config.description.clone(), 
+                            output_config.description.clone(),
                             data_file_path.clone(),
                         );
                         gallery_syncer
@@ -591,22 +591,22 @@ fn init_config(config_path_opt: &Option<PathBuf>, force: bool) -> Result<()> {
         data_file: "data/photos/gallery.yaml".to_string(),
         name: Some("My Gallery".to_string()), // Optional - will use album name if not provided
         description: Some("A collection of photos from my album".to_string()), // Optional
-        enabled: false, // Disabled by default
+        enabled: false,                       // Disabled by default
     };
 
     config.outputs.push(gallery_example);
-    
+
     // Add a minimal gallery example as well
     let minimal_gallery_example = config::OutputConfig {
         output_type: config::OutputType::Gallery,
         album_url: "https://www.icloud.com/sharedalbum/ANOTHER_GALLERY_TOKEN".to_string(),
         out_dir: "content/galleries/simple_gallery".to_string(),
         data_file: "data/photos/simple_gallery.yaml".to_string(),
-        name: None, // Will use album name from iCloud
+        name: None,        // Will use album name from iCloud
         description: None, // No description needed
-        enabled: false, // Disabled by default
+        enabled: false,    // Disabled by default
     };
-    
+
     config.outputs.push(minimal_gallery_example);
 
     debug!("Saving default configuration to {}", config_path.display());

@@ -175,7 +175,7 @@ impl IndexedPhoto {
             // Default to JPEG if we can't determine the type
             "image/jpeg".to_string()
         };
-        
+
         Self {
             guid,
             filename,

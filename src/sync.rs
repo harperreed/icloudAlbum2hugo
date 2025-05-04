@@ -29,13 +29,13 @@ use crate::index::{IndexedPhoto, PhotoIndex};
 pub fn format_photo_title(photo: &IndexedPhoto) -> String {
     // Get the date to use for display - prefer EXIF date if available, fallback to creation date
     let display_date = photo.exif_date_time.unwrap_or(photo.created_at);
-    
+
     // Format the date (January 1, 2023)
     let formatted_date = display_date.format("%B %e, %Y").to_string();
-    
-    // Start with the date 
+
+    // Start with the date
     let mut title_parts = vec![formatted_date];
-    
+
     // Add location if available
     if let Some(ref location) = photo.location {
         if let Some(ref city) = location.city {
@@ -44,7 +44,7 @@ pub fn format_photo_title(photo: &IndexedPhoto) -> String {
             title_parts.push(location.formatted_address.clone());
         }
     }
-    
+
     // Add camera information if available
     if let (Some(make), Some(model)) = (&photo.camera_make, &photo.camera_model) {
         let camera = format!("{} {}", make.trim(), model.trim());
@@ -54,7 +54,7 @@ pub fn format_photo_title(photo: &IndexedPhoto) -> String {
     } else if let Some(make) = &photo.camera_make {
         title_parts.push(make.clone());
     }
-    
+
     // Join the parts with commas
     title_parts.join(", ")
 }
@@ -1280,14 +1280,14 @@ mod tests {
         let photo2_content = fs::read_to_string(photo2_index_path)?;
 
         // Check that photo titles now use the date format
-        let display_date_pattern = format!("title: {}", 
-            chrono::Utc::now().format("%B").to_string());  // Just check for month name
-            
+        let display_date_pattern =
+            format!("title: {}", chrono::Utc::now().format("%B").to_string()); // Just check for month name
+
         assert!(
             photo1_content.contains(&display_date_pattern),
             "Photo title should contain formatted date"
         );
-        
+
         assert!(
             photo2_content.contains(&display_date_pattern),
             "Photo title should contain formatted date"

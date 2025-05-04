@@ -65,7 +65,7 @@ pub struct Photo {
 
     /// Height of the photo in pixels
     pub height: u32,
-    
+
     /// MIME type of the photo (e.g., "image/jpeg", "image/png")
     #[serde(default = "default_mime_type")]
     pub mime_type: String,
@@ -556,10 +556,14 @@ fn determine_mime_type(url: &str, derivative_key: &str) -> String {
         return "image/gif".to_string();
     } else if url.ends_with(".webp") || derivative_key.contains("webp") {
         return "image/webp".to_string();
-    } else if url.ends_with(".mov") || derivative_key.contains("mov") || url.ends_with(".mp4") || derivative_key.contains("mp4") {
+    } else if url.ends_with(".mov")
+        || derivative_key.contains("mov")
+        || url.ends_with(".mp4")
+        || derivative_key.contains("mp4")
+    {
         return "video/mp4".to_string();
     }
-    
+
     // Default to JPEG if unknown
     "image/jpeg".to_string()
 }
@@ -578,7 +582,10 @@ fn process_photo(
 
     // Find the best derivative with URL, width, height, and MIME type
     let (url, width, height, mime_type) = find_best_derivative(&photo)?;
-    debug!("Found best derivative: width={}, height={}, mime_type={}", width, height, mime_type);
+    debug!(
+        "Found best derivative: width={}, height={}, mime_type={}",
+        width, height, mime_type
+    );
 
     // Parse the created date or use current time as fallback
     let created_at = match &photo.date_created {
@@ -593,7 +600,7 @@ fn process_photo(
     // Create a checksum and build the photo object
     let guid = photo.photo_guid.clone();
     let checksum = generate_photo_checksum(&guid, &url);
-    
+
     // Determine the correct file extension based on MIME type
     let extension = match mime_type.as_str() {
         "image/jpeg" => "jpg",

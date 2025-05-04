@@ -366,16 +366,16 @@ impl GallerySyncer {
                 "video/mp4" => "mp4",
                 _ => "jpg", // Default to jpg for unknown types
             };
-            
+
             let filename = format!("{}.{}", photo.guid, extension);
-            
+
             // Generate a formatted title with date, location, and camera info
             let formatted_title = format_photo_title(photo);
-            
+
             content.push_str(&format!("  - filename: {}\n", filename));
             content.push_str(&format!("    caption: \"{}\"\n", formatted_title));
             content.push_str(&format!("    mime_type: \"{}\"\n", photo.mime_type));
-            
+
             // Add original caption if available
             if let Some(ref caption) = photo.caption {
                 if !caption.trim().is_empty() {
@@ -395,7 +395,7 @@ impl GallerySyncer {
             if let Some(ref make) = photo.camera_make {
                 content.push_str(&format!("    camera_make: \"{}\"\n", make));
             }
-            
+
             if let Some(ref model) = photo.camera_model {
                 content.push_str(&format!("    camera_model: \"{}\"\n", model));
             }
@@ -429,21 +429,20 @@ impl GallerySyncer {
                 "video/mp4" => "mp4",
                 _ => "jpg", // Default to jpg for unknown types
             };
-            
+
             let filename = format!("{}.{}", photo.guid, extension);
-            
+
             // Generate a formatted title with date, location, and camera info
             let formatted_title = format_photo_title(photo);
-            
+
             // Format the title, escaping any quotes
             let caption = formatted_title.replace('"', "\\\"");
-            
+
             // For videos, use a video shortcode instead of figure
             if photo.mime_type == "video/mp4" {
                 content.push_str(&format!(
                     "{{{{< video src=\"{}\" caption=\"{}\" >}}}}\n\n",
-                    filename,
-                    caption
+                    filename, caption
                 ));
             } else {
                 // Build the figure shortcode for images
@@ -478,7 +477,7 @@ impl GallerySyncer {
         } else {
             self.gallery_name.clone()
         };
-        
+
         // First try to find an existing gallery with the same name
         for gallery in index.galleries.values() {
             if gallery.name == gallery_name {
@@ -594,12 +593,12 @@ mod tests {
         assert!(index_md.contains("photo_count: 2"));
         assert!(index_md.contains("  - filename: photo1.jpg"));
         assert!(index_md.contains("  - filename: photo2.jpg"));
-        
+
         // Verify figure shortcodes are included
         assert!(index_md.contains("{{< figure"));
         assert!(index_md.contains("src=\"photo1.jpg\""));
         assert!(index_md.contains("src=\"photo2.jpg\""));
-        
+
         // Check for date format in captions (just verify it contains a formatted month name)
         let display_date_pattern = chrono::Utc::now().format("%B").to_string();
         assert!(index_md.contains(&display_date_pattern));
