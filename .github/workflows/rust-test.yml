@@ -1,8 +1,7 @@
 name: Rust Tests
 
 on:
-  push:
-    branches: [ main ]
+
   pull_request:
     branches: [ main ]
 
@@ -34,6 +33,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       
+      - name: Build binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
