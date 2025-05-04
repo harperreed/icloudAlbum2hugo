@@ -6,7 +6,7 @@
 //! Run with:
 //! ICLOUD_TEST_TOKEN=B2T5VaUrzMLxwU cargo test --test icloud_integration_test -- --nocapture
 
-use icloud2hugo::icloud;
+use icloudAlbum2hugo::icloud;
 use tokio;
 use std::env;
 use std::sync::Once;
