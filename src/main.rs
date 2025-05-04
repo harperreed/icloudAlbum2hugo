@@ -30,7 +30,8 @@ use std::path::PathBuf;
 use std::fs;
 use config::Config;
 use sync::Syncer;
-use mock::mock_fetch_album;
+use icloud::fetch_album;
+use log::{info, debug};
 
 #[derive(Parser)]
 #[command(author, version, about = "A tool to sync photos from iCloud to Hugo")]
@@ -69,6 +70,14 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Initialize the logger
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp(Some(env_logger::fmt::TimestampPrecision::Seconds))
+        .init();
+    
+    info!("Starting icloud2hugo");
+    debug!("Initialized logger");
+    
     let cli = Cli::parse();
 
     match &cli.command {
@@ -109,7 +118,7 @@ async fn main() -> Result<()> {
             
             // ------- FETCH ALBUM DATA -------
             println!("\n🔄 Fetching album data from iCloud...");
-            let album = match mock_fetch_album(&config_data.album_url).await {
+            let album = match fetch_album(&config_data.album_url).await {
                 Ok(album) => {
                     println!("  • Album '{}' fetched with {} photos", album.name, album.photos.len());
                     album
@@ -230,7 +239,7 @@ async fn main() -> Result<()> {
             
             // ------- FETCH REMOTE ALBUM DATA -------
             println!("\n🔄 Fetching album data from iCloud...");
-            let album = match mock_fetch_album(&config_data.album_url).await {
+            let album = match fetch_album(&config_data.album_url).await {
                 Ok(album) => {
                     println!("  • Album '{}' fetched with {} photos", album.name, album.photos.len());
                     Some(album)
