@@ -315,6 +315,7 @@ impl GallerySyncer {
     }
 
     /// Creates a gallery index.md file with frontmatter and references to all photos
+    /// using Hugo figure shortcodes
     async fn create_gallery_index(
         &self,
         index: &PhotoIndex,
@@ -331,7 +332,7 @@ impl GallerySyncer {
         let gallery_photos = index.get_gallery_photos(gallery_id);
 
         // Build frontmatter
-        let mut frontmatter = format!(
+        let mut content = format!(
             "---\ntitle: {}\ndate: {}\ntype: gallery\nlayout: gallery\n",
             gallery.name,
             Utc::now().format("%Y-%m-%dT%H:%M:%S%z")
@@ -339,26 +340,26 @@ impl GallerySyncer {
 
         // Add description if available
         if let Some(ref description) = gallery.description {
-            frontmatter.push_str(&format!("description: \"{}\"\n", description));
+            content.push_str(&format!("description: \"{}\"\n", description));
         }
 
         // Add photo count
-        frontmatter.push_str(&format!("photo_count: {}\n", gallery_photos.len()));
+        content.push_str(&format!("photo_count: {}\n", gallery_photos.len()));
 
         // Add gallery photo list
-        frontmatter.push_str("photos:\n");
+        content.push_str("photos:\n");
         for photo in &gallery_photos {
             let filename = format!("{}.jpg", photo.guid);
             let caption = photo
                 .caption
                 .clone()
                 .unwrap_or_else(|| "No caption".to_string());
-            frontmatter.push_str(&format!("  - filename: {}\n", filename));
-            frontmatter.push_str(&format!("    caption: \"{}\"\n", caption));
+            content.push_str(&format!("  - filename: {}\n", filename));
+            content.push_str(&format!("    caption: \"{}\"\n", caption));
 
             // Add location if available
             if let Some(ref location) = photo.location {
-                frontmatter.push_str(&format!(
+                content.push_str(&format!(
                     "    location: \"{}\"\n",
                     location.formatted_address
                 ));
@@ -366,24 +367,52 @@ impl GallerySyncer {
 
             // Add date
             let date = photo.exif_date_time.unwrap_or(photo.created_at);
-            frontmatter.push_str(&format!(
+            content.push_str(&format!(
                 "    date: {}\n",
                 date.format("%Y-%m-%dT%H:%M:%S%z")
             ));
         }
 
         // Close frontmatter
-        frontmatter.push_str("---\n\n");
+        content.push_str("---\n\n");
 
-        // Add content
+        // Add gallery description
         if let Some(ref description) = gallery.description {
-            frontmatter.push_str(description);
-            frontmatter.push_str("\n\n");
+            content.push_str(description);
+            content.push_str("\n\n");
+        }
+
+        // Add figure shortcodes for each photo
+        for photo in &gallery_photos {
+            let filename = format!("{}.jpg", photo.guid);
+            let caption = photo
+                .caption
+                .clone()
+                .unwrap_or_else(|| "".to_string());
+            
+            // Format the caption, escaping any quotes
+            let formatted_caption = caption.replace('"', "\\\"");
+            
+            // Get location if available
+            let location_text = if let Some(ref location) = photo.location {
+                format!(" - {}", location.formatted_address)
+            } else {
+                "".to_string()
+            };
+
+            // Build the figure shortcode
+            content.push_str(&format!(
+                "{{{{< figure\n  src=\"{}\"\n  alt=\"{}\"\n  caption=\"{}{}\"\n  class=\"ma0 w-75\"\n>}}}}\n\n",
+                filename,
+                formatted_caption,
+                formatted_caption,
+                location_text
+            ));
         }
 
         // Write to index.md
         let index_path = gallery_dir.join("index.md");
-        tokio_fs::write(&index_path, frontmatter)
+        tokio_fs::write(&index_path, content)
             .await
             .with_context(|| {
                 format!(
@@ -511,6 +540,13 @@ mod tests {
         assert!(index_md.contains("photo_count: 2"));
         assert!(index_md.contains("  - filename: photo1.jpg"));
         assert!(index_md.contains("  - filename: photo2.jpg"));
+        
+        // Verify figure shortcodes are included
+        assert!(index_md.contains("{{< figure"));
+        assert!(index_md.contains("src=\"photo1.jpg\""));
+        assert!(index_md.contains("src=\"photo2.jpg\""));
+        assert!(index_md.contains("caption=\"Caption for photo1\""));
+        assert!(index_md.contains("caption=\"Caption for photo2\""));
 
         Ok(())
     }
