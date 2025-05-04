@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use tokio::fs as tokio_fs;
 use tokio::task::{self, JoinSet};
 use futures::future::join_all;
-use log::{debug, info, warn, error};
+use log::{debug, info, warn};
 
 use crate::icloud::{Album, Photo};
 use crate::index::{PhotoIndex, IndexedPhoto};
@@ -522,6 +522,7 @@ impl Syncer {
     /// Modified version of sync_photo that doesn't directly modify the index
     /// Instead, it returns the sync result and the IndexedPhoto to be added to the index
     /// This version is kept for compatibility but not used in the new parallel implementation
+    #[allow(dead_code)]
     async fn sync_photo_task(
         photo: &Photo,
         content_dir: &Path,
@@ -622,6 +623,7 @@ impl Syncer {
     
     /// Deletes a photo that is no longer in the remote album
     /// This version updates the index, for backward compatibility
+    #[allow(dead_code)]
     async fn delete_photo(&self, guid: &str, index: &mut PhotoIndex) -> Result<()> {
         // Check if the photo exists in the index
         if !index.photos.contains_key(guid) {
@@ -644,6 +646,7 @@ impl Syncer {
     }
     
     /// Syncs a single photo
+    #[allow(dead_code)]
     async fn sync_photo(&self, photo: &Photo, index: &mut PhotoIndex) -> Result<SyncResult> {
         // Determine if this is a new photo or an update
         let existing = index.get_photo(&photo.guid);
@@ -724,6 +727,7 @@ impl Syncer {
     }
     
     /// Downloads a photo from its URL
+    #[allow(dead_code)]
     async fn download_photo(&self, photo: &Photo, path: &Path) -> Result<()> {
         // For tests, create a placeholder file instead of actually downloading
         if cfg!(test) {
@@ -760,6 +764,7 @@ impl Syncer {
     }
     
     /// Creates an index.md file with frontmatter including EXIF data
+    #[allow(dead_code)]
     async fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
         // Get the date to use for display - prefer EXIF date if available, fallback to creation date
         let display_date = photo.exif_date_time.unwrap_or(photo.created_at);

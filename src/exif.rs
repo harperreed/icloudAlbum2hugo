@@ -15,7 +15,7 @@ use std::io::BufReader;
 use std::path::Path;
 use chrono::{DateTime, TimeZone, Utc};
 use rand::Rng;
-use log::{debug, warn};
+use log::warn;
 
 /// Represents the extracted EXIF metadata from a photo
 #[derive(Debug, Clone, Default)]
