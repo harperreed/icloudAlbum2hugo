@@ -343,30 +343,30 @@ fn find_best_derivative(
 
     // If original not found, select the derivative with highest resolution (width × height)
     let mut best_derivative: Option<(&String, &icloud_album_rs::models::Derivative, u64)> = None;
-    
+
     for (key, derivative) in photo.derivatives.iter() {
         // Skip derivatives without a URL
         if derivative.url.is_none() {
             continue;
         }
-        
+
         // Get width and height, defaulting to 0 if missing
         let width = derivative.width.unwrap_or(0);
         let height = derivative.height.unwrap_or(0);
-        
+
         // Calculate resolution (width × height)
         let resolution = width as u64 * height as u64;
-        
+
         // Update best_derivative if this one has higher resolution
         match best_derivative {
             None => best_derivative = Some((key, derivative, resolution)),
             Some((_, _, best_res)) if resolution > best_res => {
                 best_derivative = Some((key, derivative, resolution));
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
-    
+
     // Use the highest resolution derivative if found
     if let Some((key, derivative, resolution)) = best_derivative {
         let result = extract_derivative_info(key, derivative);
