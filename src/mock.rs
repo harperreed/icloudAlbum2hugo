@@ -58,10 +58,12 @@ pub fn create_mock_album() -> Result<Album> {
 }
 
 // Constants for test URL identification
+#[allow(dead_code)]
 const TEST_URL_INDICATORS: [&str; 3] = ["test", "example", "custom"];
 
 /// Simulates fetching an album from a URL.
 /// For test URLs, returns a mock album.
+#[allow(dead_code)]
 pub async fn mock_fetch_album(album_url: &str) -> Result<Album> {
     // Check if any of our test indicators are in the URL, or if we're in test mode
     let is_test_url = TEST_URL_INDICATORS

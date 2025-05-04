@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::io::Write;
 use url::Url;
 
+#[allow(dead_code)]
 pub async fn debug_album_api(album_url: &str) -> Result<()> {
     // Special handling for test URLs
     if album_url.contains("#test") || album_url.contains("#custom") {

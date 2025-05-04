@@ -85,6 +85,7 @@ pub struct PhotoIndex {
 
 impl IndexedPhoto {
     /// Creates a new photo index entry with minimal data
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         guid: String,
         filename: String,
@@ -223,6 +224,7 @@ impl Default for PhotoIndex {
 }
 
 /// Converts an iCloud photo to our indexed photo format
+#[allow(dead_code)]
 pub fn convert_to_indexed_photo(
     icloud_photo: &crate::icloud::Photo,
     content_dir: &Path,

@@ -103,6 +103,7 @@ impl Album {
     /// # Returns
     ///
     /// The count of photos in the album
+    #[allow(dead_code)]
     pub fn photo_count(&self) -> usize {
         self.photos.len()
     }

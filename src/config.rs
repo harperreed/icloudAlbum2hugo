@@ -18,8 +18,11 @@ const DEFAULT_FUZZ_METERS: f64 = 100.0;
 // Define separate constants for test data - explicitly for testing only
 #[cfg(test)]
 pub(crate) mod test_constants {
+    #[allow(dead_code)]
     pub const TEST_ALBUM_TOKEN: &str = "B0T3STt0k3n123456";
+    #[allow(dead_code)]
     pub const TEST_ALBUM_URL: &str = "https://www.icloud.com/sharedalbum/#B0T3STt0k3n123456";
+    #[allow(dead_code)]
     pub const TEST_MOCK_DIRECTORY: &str = "custom/tests";
 }
 

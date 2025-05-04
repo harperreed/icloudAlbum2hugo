@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 //! # icloud2hugo
 //!
 //! A command-line tool that syncs photos from iCloud Shared Albums to a Hugo site.
