@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 // Define constants for default configuration values for clarity and reusability
 const DEFAULT_ALBUM_URL: &str = "https://www.icloud.com/sharedalbum/ALBUM_TOKEN_GOES_HERE";
-const DEFAULT_OUT_DIR: &str = "content/photostream"; 
+const DEFAULT_OUT_DIR: &str = "content/photostream";
 const DEFAULT_DATA_FILE: &str = "data/photos/index.yaml";
 const DEFAULT_FUZZ_METERS: f64 = 100.0;
 
@@ -50,23 +50,23 @@ impl Config {
                 fs::create_dir_all(parent)?;
             }
         }
-        
+
         let yaml = serde_yaml::to_string(self)?;
         fs::write(path, yaml)?;
-        
+
         Ok(())
     }
-    
+
     pub fn load_from_file(path: &Path) -> Result<Self> {
         let yaml = fs::read_to_string(path)
             .with_context(|| format!("Failed to read config from {}", path.display()))?;
-        
+
         let config = serde_yaml::from_str(&yaml)
             .with_context(|| format!("Failed to parse config from {}", path.display()))?;
-        
+
         Ok(config)
     }
-    
+
     pub fn get_config_path(config_arg: &Option<PathBuf>) -> PathBuf {
         config_arg
             .clone()
@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = Config::default();
-        
+
         assert_eq!(config.album_url, DEFAULT_ALBUM_URL);
         assert_eq!(config.out_dir, DEFAULT_OUT_DIR);
         assert_eq!(config.data_file, DEFAULT_DATA_FILE);
@@ -93,17 +93,17 @@ mod tests {
     fn test_save_and_load_config() -> Result<()> {
         let temp_dir = tempdir()?;
         let config_path = temp_dir.path().join("config.yaml");
-        
+
         let config = Config::default();
         config.save_to_file(&config_path)?;
-        
+
         let loaded_config = Config::load_from_file(&config_path)?;
-        
+
         assert_eq!(config.album_url, loaded_config.album_url);
         assert_eq!(config.out_dir, loaded_config.out_dir);
         assert_eq!(config.data_file, loaded_config.data_file);
         assert_eq!(config.fuzz_meters, loaded_config.fuzz_meters);
-        
+
         Ok(())
     }
 }

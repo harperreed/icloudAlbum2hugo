@@ -1,16 +1,16 @@
 //! Integration tests for real iCloud API
-//! 
+//!
 //! These tests are optional and only run when the ICLOUD_TEST_TOKEN environment
 //! variable is set. They test the real iCloud API integration using the provided token.
-//! 
+//!
 //! Run with:
 //! ICLOUD_TEST_TOKEN=B2T5VaUrzMLxwU cargo test --test icloud_integration_test -- --nocapture
 
 use icloudAlbum2hugo::icloud;
-use tokio;
+use log::{info, warn};
 use std::env;
 use std::sync::Once;
-use log::{info, warn};
+use tokio;
 
 /// Token for testing - can be overridden with ICLOUD_TEST_TOKEN environment variable
 const DEFAULT_TEST_TOKEN: &str = "B2T5VaUrzMLxwU";
@@ -42,58 +42,58 @@ fn create_test_url(token: &str) -> String {
 async fn test_real_icloud_fetch() {
     // Initialize the logger
     init_logger();
-    
+
     // Get the test token
     let token = get_test_token();
-    
+
     // Skip test if running in CI or explicitly disabled
     if env::var("CI").is_ok() || env::var("SKIP_ICLOUD_TEST").is_ok() {
         info!("Skipping iCloud integration test in CI environment");
         return;
     }
-    
+
     if token == DEFAULT_TEST_TOKEN {
         info!("Using default test token - override with ICLOUD_TEST_TOKEN env var if needed");
     } else {
         info!("Using custom test token from environment");
     }
-    
+
     // Create the URL
     let url = create_test_url(&token);
     info!("Testing with URL: {}", url);
-    
+
     // Fetch the album
     let result = icloud::fetch_album(&url).await;
-    
+
     // Check the result
     match result {
         Ok(album) => {
             info!("✅ Successfully fetched album: '{}'", album.name);
             info!("Found {} photos", album.photos.len());
-            
+
             if album.photos.is_empty() {
                 warn!("⚠️ Album has no photos!");
             } else {
                 info!("Album details:");
                 info!("  • Album name: {}", album.name);
                 info!("  • Photo count: {}", album.photos.len());
-                
+
                 // Print details of the first 3 photos
                 for (i, (guid, photo)) in album.photos.iter().take(3).enumerate() {
-                    info!("  • Photo {}: {}", i+1, guid);
+                    info!("  • Photo {}: {}", i + 1, guid);
                     info!("    - Caption: {:?}", photo.caption);
                     info!("    - Created: {}", photo.created_at);
                     info!("    - Dimensions: {}x{}", photo.width, photo.height);
                 }
-                
+
                 // If there are more than 3 photos, indicate this
                 if album.photos.len() > 3 {
                     info!("    ... and {} more photos", album.photos.len() - 3);
                 }
-                
+
                 info!("✅ Test passed: Successfully fetched and processed album");
             }
-        },
+        }
         Err(err) => {
             panic!("❌ Failed to fetch iCloud album: {}", err);
         }
@@ -105,38 +105,41 @@ async fn test_real_icloud_fetch() {
 async fn test_invalid_urls() {
     // Initialize the logger
     init_logger();
-    
+
     // Skip test if running in CI or explicitly disabled
     if env::var("CI").is_ok() || env::var("SKIP_ICLOUD_TEST").is_ok() {
         info!("Skipping iCloud integration test in CI environment");
         return;
     }
-    
+
     let test_cases = vec![
-        "https://www.example.com", // Not an iCloud URL
+        "https://www.example.com",                    // Not an iCloud URL
         "https://icloud.com/sharedalbum/not-a-token", // Missing proper token format
-        "https://www.icloud.com/sharedalbum/#", // Missing token
-        "B2T5VaUrzMLxwU", // Token only, not a URL
+        "https://www.icloud.com/sharedalbum/#",       // Missing token
+        "B2T5VaUrzMLxwU",                             // Token only, not a URL
     ];
-    
+
     let mut passed = 0;
     let total = test_cases.len();
-    
+
     for (i, url) in test_cases.iter().enumerate() {
-        info!("Testing invalid URL case {}/{}: {}", i+1, total, url);
-        
+        info!("Testing invalid URL case {}/{}: {}", i + 1, total, url);
+
         let result = icloud::fetch_album(url).await;
-        
+
         match result {
             Ok(_) => {
-                panic!("❌ Expected error for invalid URL '{}', but got success", url);
-            },
+                panic!(
+                    "❌ Expected error for invalid URL '{}', but got success",
+                    url
+                );
+            }
             Err(err) => {
                 info!("✅ Correctly handled invalid URL: {}", err);
                 passed += 1;
             }
         }
     }
-    
+
     info!("✅ All {} invalid URL tests passed", passed);
 }
