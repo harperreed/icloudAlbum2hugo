@@ -133,9 +133,17 @@ fn get_exif_rational_as_string(exif: &Exif, tag: Tag) -> Option<String> {
         if let Value::Rational(ref vec) = field.value {
             if let Some(rational) = vec.first() {
                 if rational.denom == 1 {
+                    // When denominator is 1, just show the numerator (e.g., "30" seconds)
                     return Some(format!("{}", rational.num));
-                } else {
+                } else if rational.num == 0 {
+                    // Handle the case where numerator is 0
+                    return Some("0".to_string());
+                } else if rational.denom % rational.num == 0 {
+                    // When denominator is a multiple of numerator (e.g., 1/60, 1/125)
                     return Some(format!("1/{}", rational.denom / rational.num));
+                } else {
+                    // General case: display as num/denom fraction
+                    return Some(format!("{}/{}", rational.num, rational.denom));
                 }
             }
         }
