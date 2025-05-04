@@ -10,7 +10,6 @@ use icloudAlbum2hugo::icloud;
 use log::{info, warn};
 use std::env;
 use std::sync::Once;
-use tokio;
 
 /// Token for testing - can be overridden with ICLOUD_TEST_TOKEN environment variable
 const DEFAULT_TEST_TOKEN: &str = "B2T5VaUrzMLxwU";
@@ -112,12 +111,10 @@ async fn test_invalid_urls() {
         return;
     }
 
-    let test_cases = vec![
-        "https://www.example.com",                    // Not an iCloud URL
+    let test_cases = ["https://www.example.com",                    // Not an iCloud URL
         "https://icloud.com/sharedalbum/not-a-token", // Missing proper token format
         "https://www.icloud.com/sharedalbum/#",       // Missing token
-        "B2T5VaUrzMLxwU",                             // Token only, not a URL
-    ];
+        "B2T5VaUrzMLxwU"];
 
     let mut passed = 0;
     let total = test_cases.len();
