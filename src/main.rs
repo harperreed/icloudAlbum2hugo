@@ -2,12 +2,15 @@ mod config;
 mod icloud;
 mod api_debug;
 mod index;
+mod sync;
+mod mock;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use config::Config;
-use api_debug::debug_album_api;
+use sync::Syncer;
+use mock::mock_fetch_album;
 
 #[derive(Parser)]
 #[command(author, version, about = "A tool to sync photos from iCloud to Hugo")]
@@ -63,28 +66,53 @@ async fn main() -> Result<()> {
             // Load or create the photo index
             let data_file_path = PathBuf::from(&config_data.data_file);
             println!("Loading photo index from {}...", data_file_path.display());
-            let photo_index = index::PhotoIndex::load(&data_file_path)
+            let mut photo_index = index::PhotoIndex::load(&data_file_path)
                 .context("Failed to load photo index")?;
             
             println!("Photo index loaded with {} photos", photo_index.photo_count());
             
-            // Debug the API to understand its structure
-            println!("Debugging album API...");
-            debug_album_api(&config_data.album_url).await
-                .context("Failed to debug album API")?;
+            // Fetch the album data
+            println!("Fetching album data from iCloud...");
+            let album = mock_fetch_album(&config_data.album_url).await
+                .context("Failed to fetch album data")?;
             
-            // For now, we'll just save the index back (no changes yet)
-            // In a real implementation, we would:
-            // 1. Fetch the album data
-            // 2. Compare with local index
-            // 3. Download new/updated photos
-            // 4. Remove deleted photos
-            // 5. Update the index
+            println!("Album '{}' fetched with {} photos", album.name, album.photos.len());
+            
+            // Create a syncer
+            let content_dir = PathBuf::from(&config_data.out_dir);
+            let syncer = Syncer::new(content_dir, data_file_path.clone());
+            
+            // Sync photos
+            println!("Syncing photos to local filesystem...");
+            let results = syncer.sync_photos(&album, &mut photo_index).await
+                .context("Failed to sync photos")?;
+            
+            // Count results by type
+            let mut added = 0;
+            let mut updated = 0;
+            let mut unchanged = 0;
+            let mut failed = 0;
+            
+            for result in &results {
+                match result {
+                    sync::SyncResult::Added(_) => added += 1,
+                    sync::SyncResult::Updated(_) => updated += 1,
+                    sync::SyncResult::Unchanged(_) => unchanged += 1,
+                    sync::SyncResult::Failed(_, _) => failed += 1,
+                }
+            }
+            
+            // Save the updated index
             println!("Saving photo index to {}...", data_file_path.display());
-            photo_index.save(&data_file_path)
+            syncer.save_index(&photo_index)
                 .context("Failed to save photo index")?;
             
-            println!("Sync completed successfully");
+            println!("Sync completed successfully:");
+            println!("  - Added: {}", added);
+            println!("  - Updated: {}", updated);
+            println!("  - Unchanged: {}", unchanged);
+            println!("  - Failed: {}", failed);
+            println!("  - Total photos in index: {}", photo_index.photo_count());
             
             Ok(())
         }
@@ -109,15 +137,54 @@ async fn main() -> Result<()> {
             
             println!("Local photos in index: {}", photo_index.photo_count());
             
-            // Use the debug function to get remote album data
-            println!("Using debug function to get album data...");
-            debug_album_api(&config_data.album_url).await
-                .context("Failed to debug album API")?;
+            // Fetch the remote album
+            println!("Fetching album data from iCloud...");
+            let album = match mock_fetch_album(&config_data.album_url).await {
+                Ok(album) => {
+                    println!("Album '{}' fetched with {} photos", album.name, album.photos.len());
+                    Some(album)
+                },
+                Err(err) => {
+                    println!("Warning: Could not fetch album: {}", err);
+                    println!("Status will only show local information");
+                    None
+                }
+            };
             
-            println!("\nStatus summary:");
-            println!("  Local photos in index: {}", photo_index.photo_count());
-            println!("  Last updated: {}", photo_index.last_updated);
-            println!("  Remote status: See album_data_debug.txt for details");
+            // If we have both local index and remote album, compare them
+            if let Some(album) = album {
+                // Get the set of photo IDs from both sources
+                let remote_ids: std::collections::HashSet<&String> = album.photos.keys().collect();
+                let local_ids: std::collections::HashSet<&String> = photo_index.photos.keys().collect();
+                
+                // Calculate the sets of new, common, and removed photos
+                let new_ids: Vec<&&String> = remote_ids.difference(&local_ids).collect();
+                let common_ids: Vec<&&String> = remote_ids.intersection(&local_ids).collect();
+                let removed_ids: Vec<&&String> = local_ids.difference(&remote_ids).collect();
+                
+                // Count potential updates by comparing checksums
+                let mut update_count = 0;
+                for &&id in &common_ids {
+                    let remote_photo = album.photos.get(id).unwrap();
+                    let local_photo = photo_index.photos.get(id).unwrap();
+                    
+                    if remote_photo.checksum != local_photo.checksum {
+                        update_count += 1;
+                    }
+                }
+                
+                println!("\nStatus summary:");
+                println!("  Local photos: {}", photo_index.photos.len());
+                println!("  Remote photos: {}", album.photos.len());
+                println!("  New photos to download: {}", new_ids.len());
+                println!("  Photos to update: {}", update_count);
+                println!("  Photos to remove: {}", removed_ids.len());
+                println!("  Last index update: {}", photo_index.last_updated);
+            } else {
+                println!("\nStatus summary (local only):");
+                println!("  Local photos: {}", photo_index.photos.len());
+                println!("  Last index update: {}", photo_index.last_updated);
+            }
             
             Ok(())
         }

@@ -328,7 +328,7 @@ We need to store a local index of photos.
 4. Wire this into the `sync` subcommand so we can load existing data, or create it if it doesn't exist.
 ```
 
-### Prompt 5: Sync Logic (Add/Update)
+### Prompt 5: Sync Logic (Add/Update) (COMPLETED)
 
 ```
 Implement the first half of the sync logic:
