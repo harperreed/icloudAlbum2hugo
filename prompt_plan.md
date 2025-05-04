@@ -371,7 +371,7 @@ Implement location metadata:
 4. Test by mocking the geocode function, verifying that the frontmatter includes both original and fuzzed coords.
 ```
 
-### Prompt 9: status Subcommand
+### Prompt 9: status Subcommand (COMPLETED)
 
 ```
 Enhance the `status` subcommand:

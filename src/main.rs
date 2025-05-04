@@ -123,35 +123,65 @@ async fn main() -> Result<()> {
         }
         Commands::Status { config } => {
             let config_data = load_config(config)?;
-            println!("Checking status...");
-            println!("Album URL: {}", config_data.album_url);
-            println!("Output directory: {}", config_data.out_dir);
-            println!("Data file: {}", config_data.data_file);
+            println!("┌─────────────────────────────────────────────┐");
+            println!("│               icloud2hugo Status             │");
+            println!("└─────────────────────────────────────────────┘");
+            
+            // Display configuration summary
+            println!("\n📋 Configuration:");
+            println!("  • Album URL: {}", config_data.album_url);
+            println!("  • Output directory: {}", config_data.out_dir);
+            println!("  • Data file: {}", config_data.data_file);
             
             // Load or create the photo index
             let data_file_path = PathBuf::from(&config_data.data_file);
-            println!("Loading photo index from {}...", data_file_path.display());
+            println!("\n📂 Loading photo index from {}...", data_file_path.display());
             let photo_index = match index::PhotoIndex::load(&data_file_path) {
                 Ok(index) => index,
                 Err(err) => {
-                    println!("Warning: Could not load photo index: {}", err);
-                    println!("Using empty index instead");
+                    println!("  ⚠️  Warning: Could not load photo index: {}", err);
+                    println!("  ℹ️  Using empty index instead");
                     index::PhotoIndex::new()
                 }
             };
             
-            println!("Local photos in index: {}", photo_index.photo_count());
+            println!("  • Local photos in index: {}", photo_index.photo_count());
+            
+            if photo_index.photo_count() > 0 {
+                println!("  • Last updated: {}", photo_index.last_updated);
+                
+                // Show metadata stats
+                let mut exif_count = 0;
+                let mut gps_count = 0;
+                let mut geocoded_count = 0;
+                
+                for photo in photo_index.photos.values() {
+                    if photo.camera_make.is_some() || photo.camera_model.is_some() {
+                        exif_count += 1;
+                    }
+                    if photo.latitude.is_some() && photo.longitude.is_some() {
+                        gps_count += 1;
+                    }
+                    if photo.location.is_some() {
+                        geocoded_count += 1;
+                    }
+                }
+                
+                println!("  • Photos with EXIF data: {}/{}", exif_count, photo_index.photo_count());
+                println!("  • Photos with GPS coordinates: {}/{}", gps_count, photo_index.photo_count());
+                println!("  • Photos with location info: {}/{}", geocoded_count, photo_index.photo_count());
+            }
             
             // Fetch the remote album
-            println!("Fetching album data from iCloud...");
+            println!("\n🔄 Fetching album data from iCloud...");
             let album = match mock_fetch_album(&config_data.album_url).await {
                 Ok(album) => {
-                    println!("Album '{}' fetched with {} photos", album.name, album.photos.len());
+                    println!("  • Album '{}' fetched with {} photos", album.name, album.photos.len());
                     Some(album)
                 },
                 Err(err) => {
-                    println!("Warning: Could not fetch album: {}", err);
-                    println!("Status will only show local information");
+                    println!("  ⚠️  Warning: Could not fetch album: {}", err);
+                    println!("  ℹ️  Status will only show local information");
                     None
                 }
             };
@@ -169,26 +199,84 @@ async fn main() -> Result<()> {
                 
                 // Count potential updates by comparing checksums
                 let mut update_count = 0;
+                let mut updated_ids = Vec::new();
                 for &&id in &common_ids {
                     let remote_photo = album.photos.get(id).unwrap();
                     let local_photo = photo_index.photos.get(id).unwrap();
                     
                     if remote_photo.checksum != local_photo.checksum {
                         update_count += 1;
+                        updated_ids.push(id);
                     }
                 }
                 
-                println!("\nStatus summary:");
-                println!("  Local photos: {}", photo_index.photos.len());
-                println!("  Remote photos: {}", album.photos.len());
-                println!("  New photos to download: {}", new_ids.len());
-                println!("  Photos to update: {}", update_count);
-                println!("  Photos to remove: {}", removed_ids.len());
-                println!("  Last index update: {}", photo_index.last_updated);
+                println!("\n📊 Status Summary:");
+                println!("  • Local photos: {}", photo_index.photos.len());
+                println!("  • Remote photos: {}", album.photos.len());
+                println!("  • Photos in sync: {}", common_ids.len() - update_count);
+                println!("  • New photos to download: {}", new_ids.len());
+                println!("  • Photos to update: {}", update_count);
+                println!("  • Photos to remove: {}", removed_ids.len());
+                
+                // Show detailed information if requested
+                let show_detail = true; // Could be a command-line flag in the future
+                
+                if show_detail {
+                    if !new_ids.is_empty() {
+                        println!("\n🆕 New photos to download:");
+                        for (i, &&id) in new_ids.iter().enumerate().take(5) {
+                            let photo = album.photos.get(id).unwrap();
+                            let caption = photo.caption.clone().unwrap_or_else(|| "No caption".to_string());
+                            println!("  {}. {} - {}", i+1, id, caption);
+                        }
+                        if new_ids.len() > 5 {
+                            println!("  ... and {} more", new_ids.len() - 5);
+                        }
+                    }
+                    
+                    if !updated_ids.is_empty() {
+                        println!("\n🔄 Photos to update:");
+                        for (i, &id) in updated_ids.iter().enumerate().take(5) {
+                            let photo = album.photos.get(id).unwrap();
+                            let caption = photo.caption.clone().unwrap_or_else(|| "No caption".to_string());
+                            println!("  {}. {} - {}", i+1, id, caption);
+                        }
+                        if updated_ids.len() > 5 {
+                            println!("  ... and {} more", updated_ids.len() - 5);
+                        }
+                    }
+                    
+                    if !removed_ids.is_empty() {
+                        println!("\n🗑️  Photos to remove:");
+                        for (i, &&id) in removed_ids.iter().enumerate().take(5) {
+                            if let Some(photo) = photo_index.photos.get(id) {
+                                let caption = photo.caption.clone().unwrap_or_else(|| "No caption".to_string());
+                                println!("  {}. {} - {}", i+1, id, caption);
+                            } else {
+                                println!("  {}. {}", i+1, id);
+                            }
+                        }
+                        if removed_ids.len() > 5 {
+                            println!("  ... and {} more", removed_ids.len() - 5);
+                        }
+                    }
+                }
+                
+                // Suggested next steps
+                println!("\n📋 Suggested Actions:");
+                if new_ids.is_empty() && update_count == 0 && removed_ids.is_empty() {
+                    println!("  ✅ Everything is up to date! No action needed.");
+                } else {
+                    println!("  • Run 'icloud2hugo sync' to update your local files");
+                }
             } else {
-                println!("\nStatus summary (local only):");
-                println!("  Local photos: {}", photo_index.photos.len());
-                println!("  Last index update: {}", photo_index.last_updated);
+                println!("\n📊 Status Summary (local only):");
+                println!("  • Local photos: {}", photo_index.photos.len());
+                if photo_index.photo_count() > 0 {
+                    println!("  • Last updated: {}", photo_index.last_updated);
+                }
+                println!("\n⚠️  Unable to compare with remote album data");
+                println!("  • Please check your internet connection and album URL");
             }
             
             Ok(())

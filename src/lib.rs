@@ -154,8 +154,84 @@ fuzz_meters: 100.0
             .success();
         
         let stdout = String::from_utf8(output.get_output().stdout.clone())?;
-        assert!(stdout.contains("Checking status"), "Should mention checking status");
+        assert!(stdout.contains("icloud2hugo Status"), "Should show status header");
+        assert!(stdout.contains("Configuration:"), "Should show configuration section");
         assert!(stdout.contains("Album URL:"), "Should show album URL");
+        assert!(stdout.contains("Output directory:"), "Should show output directory");
+        assert!(stdout.contains("Data file:"), "Should show data file path");
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_status_command_with_data() -> Result<(), Box<dyn Error>> {
+        let temp_dir = TempDir::new()?;
+        let config_path = temp_dir.path().join("config.yaml");
+        let data_dir = temp_dir.path().join("data").join("photos");
+        let index_path = data_dir.join("index.yaml");
+        
+        // Create directories
+        fs::create_dir_all(&data_dir)?;
+        
+        // Create config file
+        let config_content = format!(r#"
+album_url: "https://www.icloud.com/sharedalbum/#test123"
+out_dir: "{}/content/photostream"
+data_file: "{}"
+fuzz_meters: 100.0
+"#, temp_dir.path().display(), index_path.display());
+        fs::write(&config_path, config_content)?;
+        
+        // Create a simple index.yaml file
+        let index_content = r#"
+last_updated: 2023-01-01T00:00:00Z
+photos:
+  test1:
+    guid: "test1"
+    filename: "test1.jpg"
+    caption: "Test Photo 1"
+    created_at: 2023-01-01T00:00:00Z
+    checksum: "abc123"
+    url: "https://example.com/test1.jpg"
+    width: 1200
+    height: 800
+    last_sync: 2023-01-01T00:00:00Z
+    local_path: "content/photostream/test1/original.jpg"
+    camera_make: "Test Make"
+    camera_model: "Test Model"
+    exif_date_time: 2023-01-01T00:00:00Z
+    latitude: 41.8781
+    longitude: -87.6298
+    fuzzed_latitude: 41.8782
+    fuzzed_longitude: -87.6299
+    iso: 100
+    exposure_time: "1/100"
+    f_number: 2.8
+    focal_length: 28.0
+    location: 
+      formatted_address: "Chicago, IL, USA"
+      city: "Chicago"
+      state: "Illinois"
+      country: "United States"
+"#;
+        fs::write(&index_path, index_content)?;
+        
+        // Run status command with custom config
+        let mut cmd = cargo_bin();
+        let output = cmd
+            .arg("status")
+            .arg("--config")
+            .arg(&config_path)
+            .current_dir(temp_dir.path())
+            .assert()
+            .success();
+        
+        let stdout = String::from_utf8(output.get_output().stdout.clone())?;
+        
+        // Check detailed information is displayed
+        assert!(stdout.contains("Local photos in index: 1"), "Should show correct photo count");
+        assert!(stdout.contains("Photos with EXIF data: 1/1"), "Should show EXIF stats");
+        assert!(stdout.contains("Photos with GPS coordinates: 1/1"), "Should show GPS stats");
         
         Ok(())
     }
