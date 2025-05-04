@@ -65,6 +65,15 @@ pub struct Photo {
 
     /// Height of the photo in pixels
     pub height: u32,
+    
+    /// MIME type of the photo (e.g., "image/jpeg", "image/png")
+    #[serde(default = "default_mime_type")]
+    pub mime_type: String,
+}
+
+/// Default MIME type for backward compatibility
+fn default_mime_type() -> String {
+    "image/jpeg".to_string()
 }
 
 /// Represents a collection of photos in an album
@@ -310,9 +319,12 @@ fn extract_derivative_info(
 /// Note: It's normal for iCloud to provide different derivative types for different photos.
 ///
 /// Returns a tuple of (url, width, height) or an error if no suitable derivative is found
+/// Result containing URL, width, height, and MIME type
+type DerivativeInfo = (String, u32, u32, String);
+
 fn find_best_derivative(
     photo: &icloud_album_rs::models::Image,
-) -> Result<(String, u32, u32), ICloudError> {
+) -> Result<DerivativeInfo, ICloudError> {
     debug!("Finding best derivative for photo: {}", photo.photo_guid);
     trace!("Photo has {} derivatives", photo.derivatives.len());
 
@@ -336,8 +348,9 @@ fn find_best_derivative(
         .find(|(key, derivative)| key.contains("original") && derivative.url.is_some())
     {
         debug!("Found original derivative: {}", key);
-        if let Some(result) = extract_derivative_info(key, derivative) {
-            return Ok(result);
+        if let Some((url, width, height)) = extract_derivative_info(key, derivative) {
+            let mime_type = determine_mime_type(&url, key);
+            return Ok((url, width, height, mime_type));
         }
     }
 
@@ -371,11 +384,12 @@ fn find_best_derivative(
     if let Some((key, derivative, resolution)) = best_derivative {
         let result = extract_derivative_info(key, derivative);
         if let Some((url, width, height)) = result {
+            let mime_type = determine_mime_type(&url, key);
             info!(
-                "Selected highest resolution derivative: {} ({}×{} = {} pixels) for photo {}",
-                key, width, height, resolution, photo.photo_guid
+                "Selected highest resolution derivative: {} ({}×{} = {} pixels, MIME: {}) for photo {}",
+                key, width, height, resolution, mime_type, photo.photo_guid
             );
-            return Ok((url, width, height));
+            return Ok((url, width, height, mime_type));
         }
     }
 
@@ -530,6 +544,26 @@ fn generate_photo_checksum(guid: &str, url: &str) -> String {
     checksum
 }
 
+/// Determine the MIME type of a photo from its URL and derivative key
+fn determine_mime_type(url: &str, derivative_key: &str) -> String {
+    if url.ends_with(".jpg") || url.ends_with(".jpeg") || derivative_key.contains("jpeg") {
+        return "image/jpeg".to_string();
+    } else if url.ends_with(".png") || derivative_key.contains("png") {
+        return "image/png".to_string();
+    } else if url.ends_with(".heic") || derivative_key.contains("heic") {
+        return "image/heic".to_string();
+    } else if url.ends_with(".gif") || derivative_key.contains("gif") {
+        return "image/gif".to_string();
+    } else if url.ends_with(".webp") || derivative_key.contains("webp") {
+        return "image/webp".to_string();
+    } else if url.ends_with(".mov") || derivative_key.contains("mov") || url.ends_with(".mp4") || derivative_key.contains("mp4") {
+        return "video/mp4".to_string();
+    }
+    
+    // Default to JPEG if unknown
+    "image/jpeg".to_string()
+}
+
 /// Process a single photo from the iCloud API response and add it to the album
 fn process_photo(
     album: &mut Album,
@@ -542,9 +576,9 @@ fn process_photo(
         photo.derivatives.len()
     );
 
-    // Find the best derivative with URL, width, and height
-    let (url, width, height) = find_best_derivative(&photo)?;
-    debug!("Found best derivative: width={}, height={}", width, height);
+    // Find the best derivative with URL, width, height, and MIME type
+    let (url, width, height, mime_type) = find_best_derivative(&photo)?;
+    debug!("Found best derivative: width={}, height={}, mime_type={}", width, height, mime_type);
 
     // Parse the created date or use current time as fallback
     let created_at = match &photo.date_created {
@@ -559,16 +593,28 @@ fn process_photo(
     // Create a checksum and build the photo object
     let guid = photo.photo_guid.clone();
     let checksum = generate_photo_checksum(&guid, &url);
+    
+    // Determine the correct file extension based on MIME type
+    let extension = match mime_type.as_str() {
+        "image/jpeg" => "jpg",
+        "image/png" => "png",
+        "image/heic" => "heic",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "video/mp4" => "mp4",
+        _ => "jpg", // Default to jpg for unknown types
+    };
 
     let icloud_photo = Photo {
         guid: photo.photo_guid,
-        filename: format!("{}.jpg", guid), // Assuming JPG format
+        filename: format!("{}.{}", guid, extension),
         caption: photo.caption.clone(),
         created_at,
         checksum,
         url,
         width,
         height,
+        mime_type,
     };
 
     // Add the photo to our album
@@ -600,6 +646,7 @@ mod tests {
             url: "https://example.com/test.jpg".to_string(),
             width: 1920,
             height: 1080,
+            mime_type: "image/jpeg".to_string(),
         };
 
         let serialized = serde_json::to_string(&photo)?;
@@ -625,6 +672,7 @@ mod tests {
             url: "https://example.com/test.jpg".to_string(),
             width: 1920,
             height: 1080,
+            mime_type: "image/jpeg".to_string(),
         };
 
         album.photos.insert(photo.guid.clone(), photo);

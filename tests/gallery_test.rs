@@ -25,6 +25,7 @@ fn create_test_photo(guid: &str) -> Photo {
         url: format!("https://example.com/{}.jpg", guid),
         width: 800,
         height: 600,
+        mime_type: "image/jpeg".to_string(),
     }
 }
 

@@ -22,6 +22,11 @@ use std::path::{Path, PathBuf};
 
 use crate::geocode::Location;
 
+/// Default MIME type for backward compatibility
+fn default_mime_type() -> String {
+    "image/jpeg".to_string()
+}
+
 /// Represents a stored photo's metadata in our local index
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexedPhoto {
@@ -45,6 +50,9 @@ pub struct IndexedPhoto {
     pub last_sync: DateTime<Utc>,
     /// Local path to the photo
     pub local_path: PathBuf,
+    /// MIME type of the photo (e.g., "image/jpeg", "image/png")
+    #[serde(default = "default_mime_type")]
+    pub mime_type: String,
 
     // EXIF metadata
     /// Make of the camera used (e.g., "Apple")
@@ -150,6 +158,24 @@ impl IndexedPhoto {
         height: u32,
         local_path: PathBuf,
     ) -> Self {
+        // Determine MIME type from filename if possible
+        let mime_type = if filename.ends_with(".jpg") || filename.ends_with(".jpeg") {
+            "image/jpeg".to_string()
+        } else if filename.ends_with(".png") {
+            "image/png".to_string()
+        } else if filename.ends_with(".heic") {
+            "image/heic".to_string()
+        } else if filename.ends_with(".gif") {
+            "image/gif".to_string()
+        } else if filename.ends_with(".webp") {
+            "image/webp".to_string()
+        } else if filename.ends_with(".mp4") || filename.ends_with(".mov") {
+            "video/mp4".to_string()
+        } else {
+            // Default to JPEG if we can't determine the type
+            "image/jpeg".to_string()
+        };
+        
         Self {
             guid,
             filename,
@@ -161,6 +187,7 @@ impl IndexedPhoto {
             height,
             last_sync: Utc::now(),
             local_path,
+            mime_type,
             camera_make: None,
             camera_model: None,
             exif_date_time: None,

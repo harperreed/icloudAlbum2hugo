@@ -23,6 +23,7 @@ pub fn create_mock_album() -> Result<Album> {
             url: format!("{}mock1.jpg", MOCK_URL_PREFIX),
             width: 1200,
             height: 800,
+            mime_type: "image/jpeg".to_string(),
         },
     );
 
@@ -37,6 +38,7 @@ pub fn create_mock_album() -> Result<Album> {
             url: format!("{}mock2.jpg", MOCK_URL_PREFIX),
             width: 1920,
             height: 1080,
+            mime_type: "image/jpeg".to_string(),
         },
     );
 
@@ -51,6 +53,7 @@ pub fn create_mock_album() -> Result<Album> {
             url: format!("{}mock3.jpg", MOCK_URL_PREFIX),
             width: 800,
             height: 600,
+            mime_type: "image/jpeg".to_string(),
         },
     );
 

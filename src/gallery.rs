@@ -356,13 +356,25 @@ impl GallerySyncer {
         // Add gallery photo list
         content.push_str("photos:\n");
         for photo in &gallery_photos {
-            let filename = format!("{}.jpg", photo.guid);
+            // Get correct file extension based on MIME type
+            let extension = match photo.mime_type.as_str() {
+                "image/jpeg" => "jpg",
+                "image/png" => "png",
+                "image/heic" => "heic",
+                "image/gif" => "gif",
+                "image/webp" => "webp",
+                "video/mp4" => "mp4",
+                _ => "jpg", // Default to jpg for unknown types
+            };
+            
+            let filename = format!("{}.{}", photo.guid, extension);
             
             // Generate a formatted title with date, location, and camera info
             let formatted_title = format_photo_title(photo);
             
             content.push_str(&format!("  - filename: {}\n", filename));
             content.push_str(&format!("    caption: \"{}\"\n", formatted_title));
+            content.push_str(&format!("    mime_type: \"{}\"\n", photo.mime_type));
             
             // Add original caption if available
             if let Some(ref caption) = photo.caption {
@@ -407,7 +419,18 @@ impl GallerySyncer {
 
         // Add figure shortcodes for each photo
         for photo in &gallery_photos {
-            let filename = format!("{}.jpg", photo.guid);
+            // Get correct file extension based on MIME type
+            let extension = match photo.mime_type.as_str() {
+                "image/jpeg" => "jpg",
+                "image/png" => "png",
+                "image/heic" => "heic",
+                "image/gif" => "gif",
+                "image/webp" => "webp",
+                "video/mp4" => "mp4",
+                _ => "jpg", // Default to jpg for unknown types
+            };
+            
+            let filename = format!("{}.{}", photo.guid, extension);
             
             // Generate a formatted title with date, location, and camera info
             let formatted_title = format_photo_title(photo);
@@ -415,13 +438,22 @@ impl GallerySyncer {
             // Format the title, escaping any quotes
             let caption = formatted_title.replace('"', "\\\"");
             
-            // Build the figure shortcode
-            content.push_str(&format!(
-                "{{{{< figure\n  src=\"{}\"\n  alt=\"{}\"\n  caption=\"{}\"\n  class=\"ma0 w-75\"\n>}}}}\n\n",
-                filename,
-                caption,
-                caption
-            ));
+            // For videos, use a video shortcode instead of figure
+            if photo.mime_type == "video/mp4" {
+                content.push_str(&format!(
+                    "{{{{< video src=\"{}\" caption=\"{}\" >}}}}\n\n",
+                    filename,
+                    caption
+                ));
+            } else {
+                // Build the figure shortcode for images
+                content.push_str(&format!(
+                    "{{{{< figure\n  src=\"{}\"\n  alt=\"{}\"\n  caption=\"{}\"\n  class=\"ma0 w-75\"\n>}}}}\n\n",
+                    filename,
+                    caption,
+                    caption
+                ));
+            }
         }
 
         // Write to index.md
@@ -479,6 +511,7 @@ mod tests {
             url: format!("https://example.com/{}.jpg", guid),
             width: 800,
             height: 600,
+            mime_type: "image/jpeg".to_string(),
         }
     }
 

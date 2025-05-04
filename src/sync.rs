@@ -153,6 +153,7 @@ guid: {}
 original_filename: {}
 width: {}
 height: {}
+mime_type: {}
 ",
             title,
             photo.created_at.format("%Y-%m-%dT%H:%M:%S%z"),
@@ -160,6 +161,7 @@ height: {}
             photo.filename,
             photo.width,
             photo.height,
+            photo.mime_type,
         );
 
         // Add EXIF data if available
@@ -858,6 +860,7 @@ guid: {}
 original_filename: {}
 width: {}
 height: {}
+mime_type: {}
 ",
             title,
             photo.created_at.format("%Y-%m-%dT%H:%M:%S%z"),
@@ -865,6 +868,7 @@ height: {}
             photo.filename,
             photo.width,
             photo.height,
+            photo.mime_type,
         );
 
         // Add EXIF data if available
@@ -962,6 +966,7 @@ mod tests {
             url: format!("https://example.com/{}.jpg", guid),
             width: 800,
             height: 600,
+            mime_type: "image/jpeg".to_string(),
         }
     }
 
@@ -976,6 +981,7 @@ mod tests {
             url: format!("https://example.com/{}.jpg", guid),
             width: 800,
             height: 600,
+            mime_type: "image/jpeg".to_string(),
         }
     }
 
