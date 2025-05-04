@@ -1,3 +1,9 @@
+//! Configuration management for icloud2hugo.
+//!
+//! This module handles loading and saving the application configuration.
+//! It defines the `Config` struct that holds settings like album URL and output directories,
+//! and provides methods to read from and write to YAML files.
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;

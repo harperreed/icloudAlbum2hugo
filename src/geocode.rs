@@ -1,9 +1,19 @@
-use anyhow::{Context, Result};
+//! Reverse geocoding for icloud2hugo.
+//!
+//! This module provides functionality to convert geographic coordinates (latitude/longitude)
+//! into human-readable location information (city, state, country).
+//!
+//! It defines the `Location` struct to store formatted location data and the
+//! `GeocodingService` trait as an interface for different geocoding implementations.
+//! The current implementation uses a mock service that returns predefined locations
+//! for certain coordinate ranges, but this could be extended to use real geocoding APIs.
+
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Represents a geographic location with address components
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Location {
     /// The full formatted address (e.g., "Chicago, IL, USA")
     pub formatted_address: String,
@@ -18,17 +28,6 @@ pub struct Location {
 impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.formatted_address)
-    }
-}
-
-impl Default for Location {
-    fn default() -> Self {
-        Self {
-            formatted_address: String::new(),
-            city: None,
-            state: None,
-            country: None,
-        }
     }
 }
 

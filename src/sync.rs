@@ -1,5 +1,16 @@
+//! Core synchronization logic for icloud2hugo.
+//!
+//! This module is responsible for the main functionality of the application:
+//! - Comparing local and remote photo data
+//! - Downloading new or updated photos
+//! - Removing photos that are no longer in the remote album
+//! - Extracting EXIF data and performing reverse geocoding
+//! - Creating Hugo page bundles with appropriate frontmatter
+//!
+//! The `Syncer` struct orchestrates all of these operations, while the
+//! `SyncResult` enum tracks the status of each photo's synchronization.
+
 use anyhow::{Context, Result};
-use chrono::Utc;
 use reqwest::Client;
 use std::collections::HashSet;
 use std::fs;
@@ -7,8 +18,8 @@ use std::path::{Path, PathBuf};
 
 use crate::icloud::{Album, Photo};
 use crate::index::{PhotoIndex, IndexedPhoto};
-use crate::exif::{extract_exif, ExifMetadata};
-use crate::geocode::{GeocodingService, create_geocoding_service};
+use crate::exif::extract_exif;
+use crate::geocode::create_geocoding_service;
 
 /// Responsible for syncing photos from iCloud to the local filesystem
 pub struct Syncer {
@@ -24,15 +35,15 @@ pub struct Syncer {
 #[derive(Debug)]
 pub enum SyncResult {
     /// Photo was newly added
-    Added(String),
+    Added(#[allow(dead_code)] String),
     /// Photo was updated (already existed but changed)
-    Updated(String),
+    Updated(#[allow(dead_code)] String),
     /// Photo was already up to date (no changes)
-    Unchanged(String),
+    Unchanged(#[allow(dead_code)] String),
     /// Photo was deleted (no longer in remote album)
-    Deleted(String),
+    Deleted(#[allow(dead_code)] String),
     /// Failed to sync this photo
-    Failed(String, String), // (guid, error message)
+    Failed(#[allow(dead_code)] String, #[allow(dead_code)] String), // (guid, error message)
 }
 
 impl Syncer {
@@ -43,11 +54,6 @@ impl Syncer {
             content_dir,
             index_path,
         }
-    }
-    
-    /// Loads the current photo index
-    pub fn load_index(&self) -> Result<PhotoIndex> {
-        PhotoIndex::load(&self.index_path)
     }
     
     /// Saves the photo index
@@ -226,34 +232,6 @@ impl Syncer {
         Ok(())
     }
     
-    /// Creates an index.md file with basic frontmatter for a photo
-    fn create_index_md(&self, photo: &Photo, path: &Path) -> Result<()> {
-        let title = photo.caption.clone().unwrap_or_else(|| photo.filename.clone());
-        
-        let frontmatter = format!(
-            "---
-title: {}
-date: {}
-guid: {}
-original_filename: {}
-width: {}
-height: {}
----
-
-{}
-",
-            title,
-            photo.created_at.format("%Y-%m-%dT%H:%M:%S%z"),
-            photo.guid,
-            photo.filename,
-            photo.width,
-            photo.height,
-            photo.caption.clone().unwrap_or_default()
-        );
-        
-        fs::write(path, frontmatter)
-            .with_context(|| format!("Failed to write index.md to {}", path.display()))
-    }
     
     /// Creates an index.md file with frontmatter including EXIF data
     fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {

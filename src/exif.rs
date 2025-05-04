@@ -1,13 +1,23 @@
+//! EXIF metadata extraction for icloud2hugo.
+//!
+//! This module handles extracting and processing EXIF metadata from photos.
+//! It provides functionality to extract camera information, date/time, GPS coordinates,
+//! and other technical data from image files.
+//!
+//! The core function `extract_exif` processes a JPEG image and returns an `ExifMetadata`
+//! struct containing all the extracted information. This module also includes helper
+//! functions for parsing specific EXIF tags and fuzzing GPS coordinates for privacy.
+
 use anyhow::{Context, Result};
 use exif::{In, Tag, Value, Exif};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use chrono::{DateTime, TimeZone, Utc, Datelike, Timelike};
+use chrono::{DateTime, TimeZone, Utc};
 use rand::Rng;
 
 /// Represents the extracted EXIF metadata from a photo
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ExifMetadata {
     /// Make of the camera used to take the photo (e.g., "Apple")
     pub camera_make: Option<String>,
@@ -31,24 +41,6 @@ pub struct ExifMetadata {
     pub f_number: Option<f32>,
     /// Focal length in millimeters (e.g., 4.2mm)
     pub focal_length: Option<f32>,
-}
-
-impl Default for ExifMetadata {
-    fn default() -> Self {
-        Self {
-            camera_make: None,
-            camera_model: None,
-            date_time: None,
-            latitude: None,
-            longitude: None,
-            fuzzed_latitude: None,
-            fuzzed_longitude: None,
-            iso: None,
-            exposure_time: None,
-            f_number: None,
-            focal_length: None,
-        }
-    }
 }
 
 /// Extracts EXIF metadata from a JPEG image file
@@ -102,7 +94,7 @@ pub fn extract_exif(image_path: &Path) -> Result<ExifMetadata> {
 fn get_exif_string(exif: &Exif, tag: Tag) -> Option<String> {
     if let Some(field) = exif.get_field(tag, In::PRIMARY) {
         if let Value::Ascii(ref vec) = field.value {
-            if let Some(string) = vec.get(0) {
+            if let Some(string) = vec.first() {
                 return Some(String::from_utf8_lossy(string).to_string());
             }
         }
@@ -113,24 +105,21 @@ fn get_exif_string(exif: &Exif, tag: Tag) -> Option<String> {
 /// Helper function to extract a u32 value from EXIF data
 fn get_exif_u32(exif: &Exif, tag: Tag) -> Option<u32> {
     if let Some(field) = exif.get_field(tag, In::PRIMARY) {
-        if let Value::Short(ref vec) = field.value {
-            if let Some(&value) = vec.get(0) {
-                return Some(value as u32);
-            }
-        } else if let Value::Long(ref vec) = field.value {
-            if let Some(&value) = vec.get(0) {
-                return Some(value as u32);
-            }
+        match &field.value {
+            Value::Short(vec) => vec.first().map(|&v| u32::from(v)),
+            Value::Long(vec) => vec.first().copied(),
+            _ => None,
         }
+    } else {
+        None
     }
-    None
 }
 
 /// Helper function to extract a f32 value from EXIF data
 fn get_exif_f32(exif: &Exif, tag: Tag) -> Option<f32> {
     if let Some(field) = exif.get_field(tag, In::PRIMARY) {
         if let Value::Rational(ref vec) = field.value {
-            if let Some(rational) = vec.get(0) {
+            if let Some(rational) = vec.first() {
                 return Some(rational.to_f32());
             }
         }
@@ -142,7 +131,7 @@ fn get_exif_f32(exif: &Exif, tag: Tag) -> Option<f32> {
 fn get_exif_rational_as_string(exif: &Exif, tag: Tag) -> Option<String> {
     if let Some(field) = exif.get_field(tag, In::PRIMARY) {
         if let Value::Rational(ref vec) = field.value {
-            if let Some(rational) = vec.get(0) {
+            if let Some(rational) = vec.first() {
                 if rational.denom == 1 {
                     return Some(format!("{}", rational.num));
                 } else {
@@ -201,7 +190,7 @@ fn extract_gps_coordinates(exif: &Exif, metadata: &mut ExifMetadata) {
     
     if let Some(field) = exif.get_field(Tag::GPSLatitudeRef, In::PRIMARY) {
         if let Value::Ascii(ref vec) = field.value {
-            if let Some(dir) = vec.get(0) {
+            if let Some(dir) = vec.first() {
                 lat_dir = String::from_utf8_lossy(dir).to_string();
             }
         }
@@ -225,7 +214,7 @@ fn extract_gps_coordinates(exif: &Exif, metadata: &mut ExifMetadata) {
     
     if let Some(field) = exif.get_field(Tag::GPSLongitudeRef, In::PRIMARY) {
         if let Value::Ascii(ref vec) = field.value {
-            if let Some(dir) = vec.get(0) {
+            if let Some(dir) = vec.first() {
                 lon_dir = String::from_utf8_lossy(dir).to_string();
             }
         }
@@ -260,7 +249,6 @@ fn fuzz_coordinates(metadata: &mut ExifMetadata) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use std::io::Write;
     use tempfile::tempdir;
     use chrono::{Datelike, Timelike};

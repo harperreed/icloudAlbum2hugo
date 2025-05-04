@@ -381,7 +381,7 @@ Enhance the `status` subcommand:
 4. Test with a variety of scenarios to confirm we display correct numbers.
 ```
 
-### Prompt 10: Final Integration & Polishing
+### Prompt 10: Final Integration & Polishing (COMPLETED)
 
 ```
 Finalize and refactor:

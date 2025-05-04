@@ -229,7 +229,7 @@ photos:
         let stdout = String::from_utf8(output.get_output().stdout.clone())?;
         
         // Check detailed information is displayed
-        assert!(stdout.contains("Local photos in index: 1"), "Should show correct photo count");
+        assert!(stdout.contains("Photo index loaded with 1 photos"), "Should show correct photo count");
         assert!(stdout.contains("Photos with EXIF data: 1/1"), "Should show EXIF stats");
         assert!(stdout.contains("Photos with GPS coordinates: 1/1"), "Should show GPS stats");
         

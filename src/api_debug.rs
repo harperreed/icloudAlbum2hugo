@@ -9,9 +9,9 @@ pub async fn debug_album_api(album_url: &str) -> Result<()> {
         
         // Create a simple debug output file for test purposes
         let mut debug_output = String::new();
-        debug_output.push_str(&format!("Mock Album data:\n"));
+        debug_output.push_str("Mock Album data:\n");
         debug_output.push_str(&format!("  Album URL: {}\n", album_url));
-        debug_output.push_str(&format!("  Photos count: 3\n"));
+        debug_output.push_str("  Photos count: 3\n");
         
         // Save the debug output to a file
         let mut file = std::fs::File::create("album_data_debug.txt")?;
@@ -42,7 +42,7 @@ pub async fn debug_album_api(album_url: &str) -> Result<()> {
     
     // Since we can't directly serialize the album_data, extract the information manually
     let mut debug_output = String::new();
-    debug_output.push_str(&format!("Album data:\n"));
+    debug_output.push_str("Album data:\n");
     debug_output.push_str(&format!("  Stream name: {}\n", album_data.metadata.stream_name));
     debug_output.push_str(&format!("  Owner: {} {}\n", 
         album_data.metadata.user_first_name, 

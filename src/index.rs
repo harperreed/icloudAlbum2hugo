@@ -1,3 +1,17 @@
+//! Local photo index management for icloud2hugo.
+//!
+//! This module handles the storage and retrieval of local photo metadata
+//! in a YAML-based index file. It defines the `PhotoIndex` struct for the overall
+//! collection and the `IndexedPhoto` struct to represent individual photo metadata.
+//!
+//! The index tracks various information about each photo, including:
+//! - Basic metadata (filename, dimensions, etc.)
+//! - EXIF data (camera info, date/time, GPS coordinates)
+//! - Location information from reverse geocoding
+//!
+//! This allows the application to efficiently determine which photos need
+//! to be added, updated, or removed during synchronization.
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
