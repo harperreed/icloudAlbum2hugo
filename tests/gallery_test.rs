@@ -138,7 +138,7 @@ async fn test_gallery_syncing() -> anyhow::Result<()> {
     // Create a gallery syncer
     let gallery_syncer = GallerySyncer::new(
         content_dir.clone(),
-        "Test Gallery".to_string(),
+        Some("Test Gallery".to_string()),
         Some("Test Description".to_string()),
         index_path.clone(),
     );

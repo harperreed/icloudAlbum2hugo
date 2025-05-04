@@ -54,9 +54,9 @@ pub struct OutputConfig {
     pub out_dir: String,
     /// Data file for this output
     pub data_file: String,
-    /// Name for this output (used for gallery title or directory name)
+    /// Optional name for this output (if not provided, album name will be used)
     pub name: Option<String>,
-    /// Description for this output (primarily for galleries)
+    /// Optional description for this output
     pub description: Option<String>,
     /// Whether this output is enabled
     #[serde(default = "default_enabled")]

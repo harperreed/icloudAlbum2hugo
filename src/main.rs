@@ -229,14 +229,10 @@ async fn main() -> Result<()> {
                     OutputType::Gallery => {
                         // Use the new GallerySyncer for gallery
                         println!("\n🖼️  Creating gallery page bundle...");
-                        let gallery_name = output_config
-                            .name
-                            .clone()
-                            .unwrap_or_else(|| album.name.clone());
                         let gallery_syncer = GallerySyncer::new(
                             content_dir,
-                            gallery_name,
-                            output_config.description.clone(),
+                            output_config.name.clone(),
+                            output_config.description.clone(), 
                             data_file_path.clone(),
                         );
                         gallery_syncer

@@ -42,14 +42,14 @@ impl GallerySyncer {
     /// Creates a new gallery syncer
     pub fn new(
         content_dir: PathBuf,
-        gallery_name: String,
+        gallery_name: Option<String>,
         gallery_description: Option<String>,
         index_path: PathBuf,
     ) -> Self {
         Self {
             client: Client::new(),
             content_dir,
-            gallery_name,
+            gallery_name: gallery_name.unwrap_or_else(|| "Gallery".to_string()),
             gallery_description,
             index_path,
         }
@@ -61,6 +61,13 @@ impl GallerySyncer {
         album: &Album,
         index: &mut PhotoIndex,
     ) -> Result<Vec<SyncResult>> {
+        // Get the actual gallery name - use album name if gallery name is the default
+        let gallery_name = if self.gallery_name == "Gallery" {
+            album.name.clone()
+        } else {
+            self.gallery_name.clone()
+        };
+
         // Create a gallery ID or reuse if exists
         let gallery_id = self.get_or_create_gallery_id(album, index)?;
 
@@ -89,10 +96,10 @@ impl GallerySyncer {
             Some(g) => g,
             None => {
                 // Create a new gallery
-                let slug = slugify!(&self.gallery_name);
+                let slug = slugify!(&gallery_name);
                 let gallery = Gallery::new(
                     gallery_id.clone(),
-                    self.gallery_name.clone(),
+                    gallery_name.clone(),
                     slug,
                     self.gallery_description.clone(),
                 );
@@ -425,10 +432,17 @@ impl GallerySyncer {
     }
 
     /// Gets an existing gallery ID or creates a new one based on the gallery name
-    fn get_or_create_gallery_id(&self, _album: &Album, index: &PhotoIndex) -> Result<String> {
+    fn get_or_create_gallery_id(&self, album: &Album, index: &PhotoIndex) -> Result<String> {
+        // Get the effective gallery name - use album name if gallery name is the default
+        let gallery_name = if self.gallery_name == "Gallery" {
+            album.name.clone()
+        } else {
+            self.gallery_name.clone()
+        };
+        
         // First try to find an existing gallery with the same name
         for gallery in index.galleries.values() {
-            if gallery.name == self.gallery_name {
+            if gallery.name == gallery_name {
                 return Ok(gallery.id.clone());
             }
         }
@@ -482,7 +496,7 @@ mod tests {
         // Create the test gallery syncer
         let gallery_syncer = GallerySyncer::new(
             content_dir.clone(),
-            "Test Gallery".to_string(),
+            Some("Test Gallery".to_string()),
             Some("Test gallery description".to_string()),
             index_path.clone(),
         );
