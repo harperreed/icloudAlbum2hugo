@@ -153,19 +153,38 @@ fn get_exif_rational_as_string(exif: &Exif, tag: Tag) -> Option<String> {
 
 /// Parse EXIF DateTime format (e.g., "2023:12:25 15:30:00") into a UTC DateTime
 fn parse_exif_datetime(date_str: &str) -> Option<DateTime<Utc>> {
-    // EXIF dates are usually in format "YYYY:MM:DD HH:MM:SS"
-    let parts: Vec<&str> = date_str.split(&[' ', ':', '-'][..]).collect();
-    if parts.len() < 6 {
-        return None;
+    // Standard EXIF date format is "YYYY:MM:DD HH:MM:SS"
+    
+    // First, split by space to separate date and time parts
+    let date_time_parts: Vec<&str> = date_str.split(' ').collect();
+    if date_time_parts.len() != 2 {
+        return None; // Invalid format
     }
     
-    let year = parts[0].parse::<i32>().ok()?;
-    let month = parts[1].parse::<u32>().ok()?;
-    let day = parts[2].parse::<u32>().ok()?;
-    let hour = parts[3].parse::<u32>().ok()?;
-    let minute = parts[4].parse::<u32>().ok()?;
-    let second = parts[5].parse::<u32>().ok()?;
+    let date_part = date_time_parts[0];
+    let time_part = date_time_parts[1];
     
+    // Split date part by colon
+    let date_components: Vec<&str> = date_part.split(':').collect();
+    if date_components.len() != 3 {
+        return None; // Invalid date format
+    }
+    
+    // Split time part by colon
+    let time_components: Vec<&str> = time_part.split(':').collect();
+    if time_components.len() != 3 {
+        return None; // Invalid time format
+    }
+    
+    // Parse components
+    let year = date_components[0].parse::<i32>().ok()?;
+    let month = date_components[1].parse::<u32>().ok()?;
+    let day = date_components[2].parse::<u32>().ok()?;
+    let hour = time_components[0].parse::<u32>().ok()?;
+    let minute = time_components[1].parse::<u32>().ok()?;
+    let second = time_components[2].parse::<u32>().ok()?;
+    
+    // Create the DateTime object
     Utc.with_ymd_and_hms(year, month, day, hour, minute, second).single()
 }
 
