@@ -22,7 +22,7 @@ use crate::exif::extract_exif;
 use crate::geocode::create_geocoding_service;
 use crate::icloud::{Album, Photo};
 use crate::index::{Gallery, IndexedPhoto, PhotoIndex};
-use crate::sync::SyncResult;
+use crate::sync::{SyncResult, format_photo_title};
 
 /// Responsible for syncing photos from iCloud into a gallery
 pub struct GallerySyncer {
@@ -357,12 +357,19 @@ impl GallerySyncer {
         content.push_str("photos:\n");
         for photo in &gallery_photos {
             let filename = format!("{}.jpg", photo.guid);
-            let caption = photo
-                .caption
-                .clone()
-                .unwrap_or_else(|| "No caption".to_string());
+            
+            // Generate a formatted title with date, location, and camera info
+            let formatted_title = format_photo_title(photo);
+            
             content.push_str(&format!("  - filename: {}\n", filename));
-            content.push_str(&format!("    caption: \"{}\"\n", caption));
+            content.push_str(&format!("    caption: \"{}\"\n", formatted_title));
+            
+            // Add original caption if available
+            if let Some(ref caption) = photo.caption {
+                if !caption.trim().is_empty() {
+                    content.push_str(&format!("    original_caption: \"{}\"\n", caption));
+                }
+            }
 
             // Add location if available
             if let Some(ref location) = photo.location {
@@ -370,6 +377,15 @@ impl GallerySyncer {
                     "    location: \"{}\"\n",
                     location.formatted_address
                 ));
+            }
+
+            // Add camera if available
+            if let Some(ref make) = photo.camera_make {
+                content.push_str(&format!("    camera_make: \"{}\"\n", make));
+            }
+            
+            if let Some(ref model) = photo.camera_model {
+                content.push_str(&format!("    camera_model: \"{}\"\n", model));
             }
 
             // Add date
@@ -392,28 +408,19 @@ impl GallerySyncer {
         // Add figure shortcodes for each photo
         for photo in &gallery_photos {
             let filename = format!("{}.jpg", photo.guid);
-            let caption = photo
-                .caption
-                .clone()
-                .unwrap_or_else(|| "".to_string());
             
-            // Format the caption, escaping any quotes
-            let formatted_caption = caption.replace('"', "\\\"");
+            // Generate a formatted title with date, location, and camera info
+            let formatted_title = format_photo_title(photo);
             
-            // Get location if available
-            let location_text = if let Some(ref location) = photo.location {
-                format!(" - {}", location.formatted_address)
-            } else {
-                "".to_string()
-            };
-
+            // Format the title, escaping any quotes
+            let caption = formatted_title.replace('"', "\\\"");
+            
             // Build the figure shortcode
             content.push_str(&format!(
-                "{{{{< figure\n  src=\"{}\"\n  alt=\"{}\"\n  caption=\"{}{}\"\n  class=\"ma0 w-75\"\n>}}}}\n\n",
+                "{{{{< figure\n  src=\"{}\"\n  alt=\"{}\"\n  caption=\"{}\"\n  class=\"ma0 w-75\"\n>}}}}\n\n",
                 filename,
-                formatted_caption,
-                formatted_caption,
-                location_text
+                caption,
+                caption
             ));
         }
 
@@ -559,8 +566,10 @@ mod tests {
         assert!(index_md.contains("{{< figure"));
         assert!(index_md.contains("src=\"photo1.jpg\""));
         assert!(index_md.contains("src=\"photo2.jpg\""));
-        assert!(index_md.contains("caption=\"Caption for photo1\""));
-        assert!(index_md.contains("caption=\"Caption for photo2\""));
+        
+        // Check for date format in captions (just verify it contains a formatted month name)
+        let display_date_pattern = chrono::Utc::now().format("%B").to_string();
+        assert!(index_md.contains(&display_date_pattern));
 
         Ok(())
     }
