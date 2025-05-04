@@ -50,6 +50,154 @@ pub enum SyncResult {
     Failed(#[allow(dead_code)] String, #[allow(dead_code)] String), // (guid, error message)
 }
 
+/// Helper struct for task-local operations
+struct TaskSyncer {
+    client: Client,
+    content_dir: PathBuf,
+}
+
+impl TaskSyncer {
+    /// Downloads a photo from its URL (task-local version)
+    async fn download_photo(&self, photo: &Photo, path: &Path) -> Result<()> {
+        // For tests, create a placeholder file instead of actually downloading
+        if cfg!(test) {
+            // Create a placeholder image for tests only
+            tokio_fs::write(path, "PLACEHOLDER IMAGE CONTENT").await
+                .with_context(|| format!("Failed to write test placeholder to {}", path.display()))?;
+            return Ok(());
+        }
+        
+        // Check for test URLs explicitly - looking for exact test domains rather than a substring
+        if photo.url.starts_with("https://test.example/") || 
+           photo.url.starts_with("https://example.com/") || 
+           photo.url.starts_with("http://example.com/") {
+            // Create a placeholder for test URLs
+            tokio_fs::write(path, "PLACEHOLDER TEST URL IMAGE CONTENT").await
+                .with_context(|| format!("Failed to write test URL placeholder to {}", path.display()))?;
+            return Ok(());
+        }
+        
+        // Otherwise, download the actual image
+        let response = self.client.get(&photo.url)
+            .send()
+            .await
+            .with_context(|| format!("Failed to GET photo from {}", photo.url))?;
+        
+        let bytes = response.bytes()
+            .await
+            .context("Failed to read photo bytes")?;
+        
+        tokio_fs::write(path, bytes).await
+            .with_context(|| format!("Failed to write photo to {}", path.display()))?;
+        
+        Ok(())
+    }
+    
+    /// Creates an index.md file with frontmatter including EXIF data (task-local version)
+    async fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
+        // Get the date to use for display - prefer EXIF date if available, fallback to creation date
+        let display_date = photo.exif_date_time.unwrap_or(photo.created_at);
+        
+        // Format a nice human-readable date for the title (January 1, 2023)
+        let formatted_date = display_date.format("%B %e, %Y").to_string();
+        
+        // If there's no caption, use "Photo taken on <formatted_date>"
+        let title = match &photo.caption {
+            Some(caption) if !caption.trim().is_empty() => caption.clone(),
+            _ => format!("Photo taken on {}", formatted_date)
+        };
+        
+        // Build the frontmatter with EXIF data if available
+        let mut frontmatter = format!(
+            "---
+title: {}
+date: {}
+guid: {}
+original_filename: {}
+width: {}
+height: {}
+",
+            title,
+            photo.created_at.format("%Y-%m-%dT%H:%M:%S%z"),
+            photo.guid,
+            photo.filename,
+            photo.width,
+            photo.height,
+        );
+        
+        // Add EXIF data if available
+        if let Some(ref make) = photo.camera_make {
+            frontmatter.push_str(&format!("camera_make: {}\n", make));
+        }
+        
+        if let Some(ref model) = photo.camera_model {
+            frontmatter.push_str(&format!("camera_model: {}\n", model));
+        }
+        
+        if let Some(exif_dt) = photo.exif_date_time {
+            frontmatter.push_str(&format!("exif_date: {}\n", exif_dt.format("%Y-%m-%dT%H:%M:%S%z")));
+        }
+        
+        // Add GPS data (original and fuzzed)
+        if let Some(lat) = photo.latitude {
+            frontmatter.push_str(&format!("original_latitude: {:.6}\n", lat));
+        }
+        
+        if let Some(lon) = photo.longitude {
+            frontmatter.push_str(&format!("original_longitude: {:.6}\n", lon));
+        }
+        
+        if let Some(lat) = photo.fuzzed_latitude {
+            frontmatter.push_str(&format!("latitude: {:.6}\n", lat));
+        }
+        
+        if let Some(lon) = photo.fuzzed_longitude {
+            frontmatter.push_str(&format!("longitude: {:.6}\n", lon));
+        }
+        
+        // Add camera settings if available
+        if let Some(iso) = photo.iso {
+            frontmatter.push_str(&format!("iso: {}\n", iso));
+        }
+        
+        if let Some(ref exposure) = photo.exposure_time {
+            frontmatter.push_str(&format!("exposure_time: {}\n", exposure));
+        }
+        
+        if let Some(aperture) = photo.f_number {
+            frontmatter.push_str(&format!("f_number: {:.1}\n", aperture));
+        }
+        
+        if let Some(focal) = photo.focal_length {
+            frontmatter.push_str(&format!("focal_length: {:.1}\n", focal));
+        }
+        
+        // Add location data if available
+        if let Some(ref location) = photo.location {
+            frontmatter.push_str(&format!("location: {}\n", location.formatted_address));
+            
+            if let Some(ref city) = location.city {
+                frontmatter.push_str(&format!("city: {}\n", city));
+            }
+            
+            if let Some(ref state) = location.state {
+                frontmatter.push_str(&format!("state: {}\n", state));
+            }
+            
+            if let Some(ref country) = location.country {
+                frontmatter.push_str(&format!("country: {}\n", country));
+            }
+        }
+        
+        // Close frontmatter and add content
+        frontmatter.push_str("---\n\n");
+        frontmatter.push_str(&photo.caption.clone().unwrap_or_default());
+        
+        tokio_fs::write(path, frontmatter).await
+            .with_context(|| format!("Failed to write index.md to {}", path.display()))
+    }
+}
+
 impl Syncer {
     /// Creates a new syncer
     pub fn new(content_dir: PathBuf, index_path: PathBuf) -> Self {
@@ -110,35 +258,29 @@ impl Syncer {
         let concurrent_limit = 10; // Limit concurrent operations
         let mut tasks = JoinSet::new();
         let results = Arc::new(Mutex::new(Vec::new()));
-        let index_mutex = Arc::new(Mutex::new(index));
+        
+        // Collect photos to delete before starting tasks
+        let guids_to_delete = guids_to_delete.to_vec(); // Clone to own the data
         
         // Process deletions in batches
         for guid in guids_to_delete {
-            let guid = guid.clone();
             let content_dir = self.content_dir.clone();
             let results_clone = Arc::clone(&results);
-            let index_clone = Arc::clone(&index_mutex);
             
             tasks.spawn(async move {
                 let result = Self::delete_photo_task(&guid, &content_dir).await;
                 
-                // Lock the index to update it
-                let mut index_guard = index_clone.lock().unwrap();
-                if index_guard.photos.contains_key(&guid) {
-                    index_guard.remove_photo(&guid);
-                }
-                
                 // Store the result
                 let sync_result = match result {
-                    Ok(_) => SyncResult::Deleted(guid),
+                    Ok(_) => SyncResult::Deleted(guid.clone()),
                     Err(e) => SyncResult::Failed(
-                        guid,
+                        guid.clone(),
                         format!("Failed to delete photo: {}", e)
                     ),
                 };
                 
                 let mut results_guard = results_clone.lock().unwrap();
-                results_guard.push(sync_result);
+                results_guard.push((guid, sync_result));
             });
             
             // Limit concurrent tasks
@@ -153,10 +295,21 @@ impl Syncer {
         }
         
         // Get all results
-        let final_results = Arc::try_unwrap(results)
+        let task_results = Arc::try_unwrap(results)
             .expect("All tasks should be completed, but reference still exists")
             .into_inner()
             .expect("Failed to get inner mutex value");
+        
+        let mut final_results = Vec::new();
+        
+        // Now update the index with the results of all tasks
+        for (guid, result) in task_results {
+            // Remove from index only after successful deletion
+            if let SyncResult::Deleted(_) = &result {
+                index.remove_photo(&guid);
+            }
+            final_results.push(result);
+        }
         
         Ok(final_results)
     }
@@ -188,30 +341,42 @@ impl Syncer {
         }
         
         let concurrent_limit = 8; // Limit concurrent operations
-        let index_mutex = Arc::new(Mutex::new(index));
         let mut futures = Vec::new();
+        let results = Arc::new(Mutex::new(Vec::new()));
+        
+        // Create a vec of photos to process to avoid borrowing issues
+        let photos_to_process: Vec<_> = album.photos.values().cloned().collect();
         
         // Create tasks for each photo
-        for (guid, photo) in &album.photos {
-            let photo_clone = photo.clone();
+        for photo in photos_to_process {
+            let guid = photo.guid.clone();
             let content_dir = self.content_dir.clone();
             let client = self.client.clone();
-            let index_clone = Arc::clone(&index_mutex);
+            let results_clone = Arc::clone(&results);
             
             let future = task::spawn(async move {
-                let result = Self::sync_photo_task(
-                    &photo_clone,
-                    &content_dir,
+                // Create a task-local syncer for this photo
+                let task_syncer = TaskSyncer {
                     client,
-                    &index_clone,
-                ).await;
+                    content_dir: content_dir.clone(),
+                };
                 
+                // Determine if this is a new photo
+                let is_new = true; // We'll set the actual value based on results
+                
+                // Sync photo in the task
+                let result = Self::sync_photo_task_v2(&photo, &task_syncer).await;
+                
+                // Store both the photo and the result so we can update the index later
+                let mut results_guard = results_clone.lock().unwrap();
                 match result {
-                    Ok(sync_result) => sync_result,
-                    Err(e) => SyncResult::Failed(
-                        guid.clone(), 
-                        format!("Failed to sync photo: {}", e)
-                    ),
+                    Ok((indexed_photo, status)) => {
+                        results_guard.push((Ok(indexed_photo), status));
+                    },
+                    Err(e) => {
+                        let error = format!("Failed to sync photo: {}", e);
+                        results_guard.push((Err(error), guid));
+                    }
                 }
             });
             
@@ -225,17 +390,123 @@ impl Syncer {
         }
         
         // Wait for remaining tasks to complete
-        let results: Vec<_> = join_all(futures)
-            .await
-            .into_iter()
-            .filter_map(|r| r.ok())
-            .collect();
+        join_all(futures).await;
         
-        Ok(results)
+        // Get all results and update the index
+        let task_results = Arc::try_unwrap(results)
+            .expect("All tasks should be completed, but reference still exists")
+            .into_inner()
+            .expect("Failed to get inner mutex value");
+        
+        let mut final_results = Vec::new();
+        
+        // Update the index with successful results and collect final results
+        for (indexed_photo_result, status_or_guid) in task_results {
+            match indexed_photo_result {
+                Ok(indexed_photo) => {
+                    // Get the photo GUID before we add it to the index
+                    let guid = indexed_photo.guid.clone();
+                    
+                    // Determine if this is a new photo or an update
+                    let is_new = !index.photos.contains_key(&guid);
+                    
+                    // Add or update the index
+                    index.add_or_update_photo(indexed_photo);
+                    
+                    // Create the appropriate result
+                    let result = if is_new {
+                        SyncResult::Added(guid)
+                    } else {
+                        SyncResult::Updated(guid)
+                    };
+                    
+                    final_results.push(result);
+                },
+                Err(error) => {
+                    // Handle errors
+                    final_results.push(SyncResult::Failed(
+                        status_or_guid, 
+                        error
+                    ));
+                }
+            }
+        }
+        
+        Ok(final_results)
+    }
+    
+    /// Complete rewrite of sync_photo_task that avoids mutation of the index
+    /// Returns both the IndexedPhoto and whether it's new/updated/unchanged
+    async fn sync_photo_task_v2(
+        photo: &Photo,
+        task_syncer: &TaskSyncer,
+    ) -> Result<(IndexedPhoto, String)> {
+        // Create directory for this photo
+        let photo_dir = task_syncer.content_dir.join(&photo.guid);
+        tokio_fs::create_dir_all(&photo_dir).await
+            .with_context(|| format!("Failed to create directory for photo {}", photo.guid))?;
+        
+        // Download the image
+        let image_path = photo_dir.join("original.jpg");
+        task_syncer.download_photo(photo, &image_path).await
+            .with_context(|| format!("Failed to download photo {}", photo.guid))?;
+        
+        // Create a basic IndexedPhoto
+        let mut indexed_photo = IndexedPhoto::new(
+            photo.guid.clone(),
+            photo.filename.clone(),
+            photo.caption.clone(),
+            photo.created_at,
+            photo.checksum.clone(),
+            photo.url.clone(),
+            photo.width,
+            photo.height,
+            image_path.clone(),
+        );
+        
+        // Extract EXIF data if possible
+        if image_path.exists() {
+            match extract_exif(&image_path) {
+                Ok(exif_data) => {
+                    // Update indexed photo with EXIF metadata
+                    indexed_photo.update_exif(&exif_data);
+                    
+                    // If GPS coordinates are available, perform reverse geocoding
+                    if let (Some(lat), Some(lon)) = (indexed_photo.latitude, indexed_photo.longitude) {
+                        let geocoding_service = create_geocoding_service();
+                        match geocoding_service.reverse_geocode(lat, lon) {
+                            Ok(location) => {
+                                // Update the photo with location data
+                                indexed_photo.update_location(location);
+                            }
+                            Err(e) => {
+                                warn!("Failed to geocode location for {}: {}", photo.guid, e);
+                                // Continue without location data
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to extract EXIF data from {}: {}", photo.guid, e);
+                    // Continue without EXIF data
+                }
+            }
+        }
+        
+        // Create index.md with frontmatter (now with potential EXIF data)
+        let index_md_path = photo_dir.join("index.md");
+        task_syncer.create_index_md_with_exif(&indexed_photo, &index_md_path).await
+            .with_context(|| format!("Failed to create index.md for photo {}", photo.guid))?;
+        
+        // Return the indexed photo and its status
+        // Note: The actual status (new/updated) will be determined in the caller
+        // based on the index's current state
+        Ok((indexed_photo, photo.guid.clone()))
     }
     
     /// Modified version of sync_photo that doesn't directly modify the index
     /// Instead, it returns the sync result and the IndexedPhoto to be added to the index
+    /// This version is kept for compatibility but not used in the new parallel implementation
     async fn sync_photo_task(
         photo: &Photo,
         content_dir: &Path,
@@ -332,154 +603,6 @@ impl Syncer {
         };
         
         Ok(result)
-    }
-    
-    /// Helper struct for task-local operations
-    struct TaskSyncer {
-        client: Client,
-        content_dir: PathBuf,
-    }
-    
-    impl TaskSyncer {
-        /// Downloads a photo from its URL (task-local version)
-        async fn download_photo(&self, photo: &Photo, path: &Path) -> Result<()> {
-            // For tests, create a placeholder file instead of actually downloading
-            if cfg!(test) {
-                // Create a placeholder image for tests only
-                tokio_fs::write(path, "PLACEHOLDER IMAGE CONTENT").await
-                    .with_context(|| format!("Failed to write test placeholder to {}", path.display()))?;
-                return Ok(());
-            }
-            
-            // Check for test URLs explicitly - looking for exact test domains rather than a substring
-            if photo.url.starts_with("https://test.example/") || 
-               photo.url.starts_with("https://example.com/") || 
-               photo.url.starts_with("http://example.com/") {
-                // Create a placeholder for test URLs
-                tokio_fs::write(path, "PLACEHOLDER TEST URL IMAGE CONTENT").await
-                    .with_context(|| format!("Failed to write test URL placeholder to {}", path.display()))?;
-                return Ok(());
-            }
-            
-            // Otherwise, download the actual image
-            let response = self.client.get(&photo.url)
-                .send()
-                .await
-                .with_context(|| format!("Failed to GET photo from {}", photo.url))?;
-            
-            let bytes = response.bytes()
-                .await
-                .context("Failed to read photo bytes")?;
-            
-            tokio_fs::write(path, bytes).await
-                .with_context(|| format!("Failed to write photo to {}", path.display()))?;
-            
-            Ok(())
-        }
-        
-        /// Creates an index.md file with frontmatter including EXIF data (task-local version)
-        async fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
-            // Get the date to use for display - prefer EXIF date if available, fallback to creation date
-            let display_date = photo.exif_date_time.unwrap_or(photo.created_at);
-            
-            // Format a nice human-readable date for the title (January 1, 2023)
-            let formatted_date = display_date.format("%B %e, %Y").to_string();
-            
-            // If there's no caption, use "Photo taken on <formatted_date>"
-            let title = match &photo.caption {
-                Some(caption) if !caption.trim().is_empty() => caption.clone(),
-                _ => format!("Photo taken on {}", formatted_date)
-            };
-            
-            // Build the frontmatter with EXIF data if available
-            let mut frontmatter = format!(
-                "---
-title: {}
-date: {}
-guid: {}
-original_filename: {}
-width: {}
-height: {}
-",
-                title,
-                photo.created_at.format("%Y-%m-%dT%H:%M:%S%z"),
-                photo.guid,
-                photo.filename,
-                photo.width,
-                photo.height,
-            );
-            
-            // Add EXIF data if available
-            if let Some(ref make) = photo.camera_make {
-                frontmatter.push_str(&format!("camera_make: {}\n", make));
-            }
-            
-            if let Some(ref model) = photo.camera_model {
-                frontmatter.push_str(&format!("camera_model: {}\n", model));
-            }
-            
-            if let Some(exif_dt) = photo.exif_date_time {
-                frontmatter.push_str(&format!("exif_date: {}\n", exif_dt.format("%Y-%m-%dT%H:%M:%S%z")));
-            }
-            
-            // Add GPS data (original and fuzzed)
-            if let Some(lat) = photo.latitude {
-                frontmatter.push_str(&format!("original_latitude: {:.6}\n", lat));
-            }
-            
-            if let Some(lon) = photo.longitude {
-                frontmatter.push_str(&format!("original_longitude: {:.6}\n", lon));
-            }
-            
-            if let Some(lat) = photo.fuzzed_latitude {
-                frontmatter.push_str(&format!("latitude: {:.6}\n", lat));
-            }
-            
-            if let Some(lon) = photo.fuzzed_longitude {
-                frontmatter.push_str(&format!("longitude: {:.6}\n", lon));
-            }
-            
-            // Add camera settings if available
-            if let Some(iso) = photo.iso {
-                frontmatter.push_str(&format!("iso: {}\n", iso));
-            }
-            
-            if let Some(ref exposure) = photo.exposure_time {
-                frontmatter.push_str(&format!("exposure_time: {}\n", exposure));
-            }
-            
-            if let Some(aperture) = photo.f_number {
-                frontmatter.push_str(&format!("f_number: {:.1}\n", aperture));
-            }
-            
-            if let Some(focal) = photo.focal_length {
-                frontmatter.push_str(&format!("focal_length: {:.1}\n", focal));
-            }
-            
-            // Add location data if available
-            if let Some(ref location) = photo.location {
-                frontmatter.push_str(&format!("location: {}\n", location.formatted_address));
-                
-                if let Some(ref city) = location.city {
-                    frontmatter.push_str(&format!("city: {}\n", city));
-                }
-                
-                if let Some(ref state) = location.state {
-                    frontmatter.push_str(&format!("state: {}\n", state));
-                }
-                
-                if let Some(ref country) = location.country {
-                    frontmatter.push_str(&format!("country: {}\n", country));
-                }
-            }
-            
-            // Close frontmatter and add content
-            frontmatter.push_str("---\n\n");
-            frontmatter.push_str(&photo.caption.clone().unwrap_or_default());
-            
-            tokio_fs::write(path, frontmatter).await
-                .with_context(|| format!("Failed to write index.md to {}", path.display()))
-        }
     }
     
     /// Deletes a photo that is no longer in the remote album
@@ -620,7 +743,6 @@ height: {}
         
         Ok(())
     }
-    
     
     /// Creates an index.md file with frontmatter including EXIF data
     async fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
