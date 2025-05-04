@@ -176,14 +176,19 @@ fn extract_token(album_url: &str) -> Result<String> {
             let url = Url::parse(album_url)
                 .with_context(|| format!("Invalid iCloud shared album invitation URL: {}", album_url))?;
             
-            let path_segments: Vec<&str> = url.path().split('/').collect();
+            // Use path_segments() which returns an iterator of segments
+            let mut segments = url.path_segments()
+                .ok_or_else(|| anyhow::anyhow!("Invalid URL path: cannot be base"))?;
             
-            // The token should be the last part of the path after "photos/"
-            if path_segments.len() >= 2 && path_segments[1] == "photos" && path_segments.len() >= 3 {
-                Ok(path_segments[2].to_string())
-            } else {
-                Err(anyhow::anyhow!("Invalid iCloud shared album invitation URL: unable to extract token from path"))
+            // Find "photos" segment and get the next segment as the token
+            if let Some("photos") = segments.next() {
+                if let Some(token) = segments.next() {
+                    return Ok(token.to_string());
+                }
             }
+            
+            // If we didn't find a valid token after "photos"
+            Err(anyhow::anyhow!("Invalid iCloud shared album invitation URL: unable to extract token from path"))
         },
         ICloudUrlFormat::Unknown => {
             Err(anyhow::anyhow!("Unsupported iCloud URL format: {}", album_url))
