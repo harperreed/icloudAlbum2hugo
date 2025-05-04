@@ -41,9 +41,9 @@ mod tests {
             .output()
             .expect("Failed to build binary");
 
-        assert!(cargo.status.success(), "Failed to build icloud2hugo");
+        assert!(cargo.status.success(), "Failed to build icloudAlbum2hugo");
 
-        Command::cargo_bin("icloud2hugo").expect("Failed to find icloud2hugo binary")
+        Command::cargo_bin("icloudAlbum2hugo").expect("Failed to find icloudAlbum2hugo binary")
     }
 
     #[test]
