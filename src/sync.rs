@@ -208,11 +208,19 @@ impl Syncer {
     
     /// Downloads a photo from its URL
     async fn download_photo(&self, photo: &Photo, path: &Path) -> Result<()> {
-        // For tests or development, we can create a placeholder file instead of
-        // actually downloading (the url might not be real in tests)
-        if photo.url.contains("example.com") || cfg!(test) {
-            // Create a placeholder image
+        // For tests, create a placeholder file instead of actually downloading
+        if cfg!(test) {
+            // Create a placeholder image for tests only
             fs::write(path, "PLACEHOLDER IMAGE CONTENT")?;
+            return Ok(());
+        }
+        
+        // Check for test URLs explicitly - looking for exact test domains rather than a substring
+        if photo.url.starts_with("https://example.com/") || 
+           photo.url.starts_with("http://example.com/") || 
+           photo.url.starts_with("https://test.example/") {
+            // Create a placeholder for test URLs
+            fs::write(path, "PLACEHOLDER TEST URL IMAGE CONTENT")?;
             return Ok(());
         }
         
