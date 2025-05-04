@@ -350,7 +350,7 @@ Continue the sync logic:
 4. Test this with a scenario where a photo was removed from the mock remote data.
 ```
 
-### Prompt 7: EXIF Parsing
+### Prompt 7: EXIF Parsing (COMPLETED)
 
 ```
 Now add EXIF data extraction.

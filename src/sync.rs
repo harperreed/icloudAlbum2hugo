@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::icloud::{Album, Photo};
 use crate::index::{PhotoIndex, IndexedPhoto};
+use crate::exif::{extract_exif, ExifMetadata};
 
 /// Responsible for syncing photos from iCloud to the local filesystem
 pub struct Syncer {
@@ -98,11 +99,10 @@ impl Syncer {
     
     /// Deletes a photo that is no longer in the remote album
     fn delete_photo(&self, guid: &str, index: &mut PhotoIndex) -> Result<()> {
-        // Get the photo from the index
-        let photo = match index.get_photo(guid) {
-            Some(photo) => photo,
-            None => return Ok(()),  // Photo not in index, nothing to do
-        };
+        // Check if the photo exists in the index
+        if !index.photos.contains_key(guid) {
+            return Ok(());  // Photo not in index, nothing to do
+        }
         
         // Get the directory containing the photo
         let photo_dir = self.content_dir.join(guid);
@@ -141,24 +141,37 @@ impl Syncer {
         self.download_photo(photo, &image_path).await
             .with_context(|| format!("Failed to download photo {}", photo.guid))?;
         
-        // Create index.md with frontmatter
-        let index_md_path = photo_dir.join("index.md");
-        self.create_index_md(photo, &index_md_path)
-            .with_context(|| format!("Failed to create index.md for photo {}", photo.guid))?;
+        // Create a basic IndexedPhoto
+        let mut indexed_photo = IndexedPhoto::new(
+            photo.guid.clone(),
+            photo.filename.clone(),
+            photo.caption.clone(),
+            photo.created_at,
+            photo.checksum.clone(),
+            photo.url.clone(),
+            photo.width,
+            photo.height,
+            image_path.clone(),
+        );
         
-        // Update the index
-        let indexed_photo = IndexedPhoto {
-            guid: photo.guid.clone(),
-            filename: photo.filename.clone(),
-            caption: photo.caption.clone(),
-            created_at: photo.created_at,
-            checksum: photo.checksum.clone(),
-            url: photo.url.clone(),
-            width: photo.width,
-            height: photo.height,
-            last_sync: Utc::now(),
-            local_path: image_path,
-        };
+        // Extract EXIF data if possible
+        if image_path.exists() {
+            match extract_exif(&image_path) {
+                Ok(exif_data) => {
+                    // Update indexed photo with EXIF metadata
+                    indexed_photo.update_exif(&exif_data);
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to extract EXIF data from {}: {}", photo.guid, e);
+                    // Continue without EXIF data
+                }
+            }
+        }
+        
+        // Create index.md with frontmatter (now with potential EXIF data)
+        let index_md_path = photo_dir.join("index.md");
+        self.create_index_md_with_exif(&indexed_photo, &index_md_path)
+            .with_context(|| format!("Failed to create index.md for photo {}", photo.guid))?;
         
         // Add or update the index entry
         let result = if existing.is_some() {
@@ -197,7 +210,7 @@ impl Syncer {
         Ok(())
     }
     
-    /// Creates an index.md file with frontmatter for a photo
+    /// Creates an index.md file with basic frontmatter for a photo
     fn create_index_md(&self, photo: &Photo, path: &Path) -> Result<()> {
         let title = photo.caption.clone().unwrap_or_else(|| photo.filename.clone());
         
@@ -221,6 +234,83 @@ height: {}
             photo.height,
             photo.caption.clone().unwrap_or_default()
         );
+        
+        fs::write(path, frontmatter)
+            .with_context(|| format!("Failed to write index.md to {}", path.display()))
+    }
+    
+    /// Creates an index.md file with frontmatter including EXIF data
+    fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
+        let title = photo.caption.clone().unwrap_or_else(|| photo.filename.clone());
+        
+        // Build the frontmatter with EXIF data if available
+        let mut frontmatter = format!(
+            "---
+title: {}
+date: {}
+guid: {}
+original_filename: {}
+width: {}
+height: {}
+",
+            title,
+            photo.created_at.format("%Y-%m-%dT%H:%M:%S%z"),
+            photo.guid,
+            photo.filename,
+            photo.width,
+            photo.height,
+        );
+        
+        // Add EXIF data if available
+        if let Some(ref make) = photo.camera_make {
+            frontmatter.push_str(&format!("camera_make: {}\n", make));
+        }
+        
+        if let Some(ref model) = photo.camera_model {
+            frontmatter.push_str(&format!("camera_model: {}\n", model));
+        }
+        
+        if let Some(exif_dt) = photo.exif_date_time {
+            frontmatter.push_str(&format!("exif_date: {}\n", exif_dt.format("%Y-%m-%dT%H:%M:%S%z")));
+        }
+        
+        // Add GPS data (original and fuzzed)
+        if let Some(lat) = photo.latitude {
+            frontmatter.push_str(&format!("original_latitude: {:.6}\n", lat));
+        }
+        
+        if let Some(lon) = photo.longitude {
+            frontmatter.push_str(&format!("original_longitude: {:.6}\n", lon));
+        }
+        
+        if let Some(lat) = photo.fuzzed_latitude {
+            frontmatter.push_str(&format!("latitude: {:.6}\n", lat));
+        }
+        
+        if let Some(lon) = photo.fuzzed_longitude {
+            frontmatter.push_str(&format!("longitude: {:.6}\n", lon));
+        }
+        
+        // Add camera settings if available
+        if let Some(iso) = photo.iso {
+            frontmatter.push_str(&format!("iso: {}\n", iso));
+        }
+        
+        if let Some(ref exposure) = photo.exposure_time {
+            frontmatter.push_str(&format!("exposure_time: {}\n", exposure));
+        }
+        
+        if let Some(aperture) = photo.f_number {
+            frontmatter.push_str(&format!("f_number: {:.1}\n", aperture));
+        }
+        
+        if let Some(focal) = photo.focal_length {
+            frontmatter.push_str(&format!("focal_length: {:.1}\n", focal));
+        }
+        
+        // Close frontmatter and add content
+        frontmatter.push_str("---\n\n");
+        frontmatter.push_str(&photo.caption.clone().unwrap_or_default());
         
         fs::write(path, frontmatter)
             .with_context(|| format!("Failed to write index.md to {}", path.display()))
@@ -329,18 +419,17 @@ mod tests {
         
         // Add the photos to the index with the same checksums
         for (guid, photo) in &album.photos {
-            let indexed_photo = IndexedPhoto {
-                guid: guid.clone(),
-                filename: photo.filename.clone(),
-                caption: photo.caption.clone(),
-                created_at: photo.created_at,
-                checksum: photo.checksum.clone(), // Same checksum!
-                url: photo.url.clone(),
-                width: photo.width,
-                height: photo.height,
-                last_sync: Utc::now(),
-                local_path: PathBuf::from(format!("/content/{}/original.jpg", guid)),
-            };
+            let indexed_photo = IndexedPhoto::new(
+                guid.clone(),
+                photo.filename.clone(),
+                photo.caption.clone(),
+                photo.created_at,
+                photo.checksum.clone(), // Same checksum!
+                photo.url.clone(),
+                photo.width,
+                photo.height,
+                PathBuf::from(format!("/content/{}/original.jpg", guid)),
+            );
             
             index.add_or_update_photo(indexed_photo);
         }
@@ -384,18 +473,17 @@ mod tests {
         
         // Add the photos to the index with different checksums
         for (guid, photo) in &album.photos {
-            let indexed_photo = IndexedPhoto {
-                guid: guid.clone(),
-                filename: photo.filename.clone(),
-                caption: photo.caption.clone(),
-                created_at: photo.created_at,
-                checksum: format!("different_checksum_{}", guid), // Different checksum!
-                url: photo.url.clone(),
-                width: photo.width,
-                height: photo.height,
-                last_sync: Utc::now(),
-                local_path: PathBuf::from(format!("/content/{}/original.jpg", guid)),
-            };
+            let indexed_photo = IndexedPhoto::new(
+                guid.clone(),
+                photo.filename.clone(),
+                photo.caption.clone(),
+                photo.created_at,
+                format!("different_checksum_{}", guid), // Different checksum!
+                photo.url.clone(),
+                photo.width,
+                photo.height,
+                PathBuf::from(format!("/content/{}/original.jpg", guid)),
+            );
             
             index.add_or_update_photo(indexed_photo);
         }
@@ -444,18 +532,17 @@ mod tests {
             fs::write(photo_dir.join("original.jpg"), "test content")?;
             fs::write(photo_dir.join("index.md"), "test content")?;
             
-            let indexed_photo = IndexedPhoto {
-                guid: photo.guid.clone(),
-                filename: photo.filename.clone(),
-                caption: photo.caption.clone(),
-                created_at: photo.created_at,
-                checksum: photo.checksum.clone(),
-                url: photo.url.clone(),
-                width: photo.width,
-                height: photo.height,
-                last_sync: Utc::now(),
-                local_path: photo_dir.join("original.jpg"),
-            };
+            let indexed_photo = IndexedPhoto::new(
+                photo.guid.clone(),
+                photo.filename.clone(),
+                photo.caption.clone(),
+                photo.created_at,
+                photo.checksum.clone(),
+                photo.url.clone(),
+                photo.width,
+                photo.height,
+                photo_dir.join("original.jpg"),
+            );
             
             index.add_or_update_photo(indexed_photo);
         }

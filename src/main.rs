@@ -4,6 +4,7 @@ mod api_debug;
 mod index;
 mod sync;
 mod mock;
+mod exif;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
