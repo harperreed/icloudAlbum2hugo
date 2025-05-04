@@ -15,6 +15,7 @@ use reqwest::Client;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tokio::fs as tokio_fs;
 
 use crate::icloud::{Album, Photo};
 use crate::index::{PhotoIndex, IndexedPhoto};
@@ -67,7 +68,7 @@ impl Syncer {
         let mut results = Vec::new();
         
         // Ensure the content directory exists
-        fs::create_dir_all(&self.content_dir)
+        tokio_fs::create_dir_all(&self.content_dir).await
             .context("Failed to create content directory")?;
         
         // Keep track of remote photo IDs
@@ -81,7 +82,7 @@ impl Syncer {
         
         // Delete photos that are no longer in the remote album
         for guid in &photos_to_delete {
-            match self.delete_photo(guid, index) {
+            match self.delete_photo(guid, index).await {
                 Ok(_) => results.push(SyncResult::Deleted(guid.clone())),
                 Err(e) => results.push(SyncResult::Failed(
                     guid.clone(),
@@ -105,7 +106,7 @@ impl Syncer {
     }
     
     /// Deletes a photo that is no longer in the remote album
-    fn delete_photo(&self, guid: &str, index: &mut PhotoIndex) -> Result<()> {
+    async fn delete_photo(&self, guid: &str, index: &mut PhotoIndex) -> Result<()> {
         // Check if the photo exists in the index
         if !index.photos.contains_key(guid) {
             return Ok(());  // Photo not in index, nothing to do
@@ -114,9 +115,9 @@ impl Syncer {
         // Get the directory containing the photo
         let photo_dir = self.content_dir.join(guid);
         
-        // Remove the directory if it exists
-        if photo_dir.exists() {
-            fs::remove_dir_all(&photo_dir)
+        // Check if directory exists asynchronously
+        if tokio_fs::try_exists(&photo_dir).await.unwrap_or(false) {
+            tokio_fs::remove_dir_all(&photo_dir).await
                 .with_context(|| format!("Failed to delete directory for photo {}", guid))?;
         }
         
@@ -140,7 +141,7 @@ impl Syncer {
         
         // Create directory for this photo
         let photo_dir = self.content_dir.join(&photo.guid);
-        fs::create_dir_all(&photo_dir)
+        tokio_fs::create_dir_all(&photo_dir).await
             .with_context(|| format!("Failed to create directory for photo {}", photo.guid))?;
         
         // Download the image
@@ -192,7 +193,7 @@ impl Syncer {
         
         // Create index.md with frontmatter (now with potential EXIF data)
         let index_md_path = photo_dir.join("index.md");
-        self.create_index_md_with_exif(&indexed_photo, &index_md_path)
+        self.create_index_md_with_exif(&indexed_photo, &index_md_path).await
             .with_context(|| format!("Failed to create index.md for photo {}", photo.guid))?;
         
         // Add or update the index entry
@@ -211,7 +212,8 @@ impl Syncer {
         // For tests, create a placeholder file instead of actually downloading
         if cfg!(test) {
             // Create a placeholder image for tests only
-            fs::write(path, "PLACEHOLDER IMAGE CONTENT")?;
+            tokio_fs::write(path, "PLACEHOLDER IMAGE CONTENT").await
+                .with_context(|| format!("Failed to write test placeholder to {}", path.display()))?;
             return Ok(());
         }
         
@@ -220,7 +222,8 @@ impl Syncer {
            photo.url.starts_with("http://example.com/") || 
            photo.url.starts_with("https://test.example/") {
             // Create a placeholder for test URLs
-            fs::write(path, "PLACEHOLDER TEST URL IMAGE CONTENT")?;
+            tokio_fs::write(path, "PLACEHOLDER TEST URL IMAGE CONTENT").await
+                .with_context(|| format!("Failed to write test URL placeholder to {}", path.display()))?;
             return Ok(());
         }
         
@@ -234,7 +237,7 @@ impl Syncer {
             .await
             .context("Failed to read photo bytes")?;
         
-        fs::write(path, bytes)
+        tokio_fs::write(path, bytes).await
             .with_context(|| format!("Failed to write photo to {}", path.display()))?;
         
         Ok(())
@@ -242,7 +245,7 @@ impl Syncer {
     
     
     /// Creates an index.md file with frontmatter including EXIF data
-    fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
+    async fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
         // Get the date to use for display - prefer EXIF date if available, fallback to creation date
         let display_date = photo.exif_date_time.unwrap_or(photo.created_at);
         
@@ -341,7 +344,7 @@ height: {}
         frontmatter.push_str("---\n\n");
         frontmatter.push_str(&photo.caption.clone().unwrap_or_default());
         
-        fs::write(path, frontmatter)
+        tokio_fs::write(path, frontmatter).await
             .with_context(|| format!("Failed to write index.md to {}", path.display()))
     }
 }
