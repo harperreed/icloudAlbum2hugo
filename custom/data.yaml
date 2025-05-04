@@ -1,28 +1,5 @@
 last_updated: 2025-05-04T00:41:36.847504Z
 photos:
-  mock3:
-    guid: mock3
-    filename: photo_with_no_caption.jpg
-    caption: null
-    created_at: 2025-05-04T00:41:36.837101Z
-    checksum: mock_checksum_3
-    url: https://example.com/mock3.jpg
-    width: 800
-    height: 600
-    last_sync: 2025-05-04T00:41:36.847091Z
-    local_path: custom/path/mock3/original.jpg
-    camera_make: null
-    camera_model: null
-    exif_date_time: null
-    latitude: null
-    longitude: null
-    fuzzed_latitude: null
-    fuzzed_longitude: null
-    iso: null
-    exposure_time: null
-    f_number: null
-    focal_length: null
-    location: null
   mock2:
     guid: mock2
     filename: mock2.jpg
@@ -57,6 +34,29 @@ photos:
     height: 800
     last_sync: 2025-05-04T00:41:36.847311Z
     local_path: custom/path/mock1/original.jpg
+    camera_make: null
+    camera_model: null
+    exif_date_time: null
+    latitude: null
+    longitude: null
+    fuzzed_latitude: null
+    fuzzed_longitude: null
+    iso: null
+    exposure_time: null
+    f_number: null
+    focal_length: null
+    location: null
+  mock3:
+    guid: mock3
+    filename: photo_with_no_caption.jpg
+    caption: null
+    created_at: 2025-05-04T00:41:36.837101Z
+    checksum: mock_checksum_3
+    url: https://example.com/mock3.jpg
+    width: 800
+    height: 600
+    last_sync: 2025-05-04T00:41:36.847091Z
+    local_path: custom/path/mock3/original.jpg
     camera_make: null
     camera_model: null
     exif_date_time: null

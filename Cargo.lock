@@ -705,7 +705,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "icloud2hugo"
+name = "icloudAlbum2hugo"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -1,7 +1,14 @@
 [package]
-name = "icloud2hugo"
+name = "icloudAlbum2hugo"
 version = "0.1.0"
 edition = "2024"
+authors = ["Harper Reed <harper@harper.website>"]
+description = "A command-line tool that syncs photos from iCloud Shared Albums to a Hugo site"
+readme = "README.md"
+repository = "https://github.com/harperreed/icloudAlbum2hugo"
+license = "MIT"
+keywords = ["hugo", "icloud", "photos", "cli", "static-site"]
+categories = ["command-line-utilities", "multimedia", "web-programming"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

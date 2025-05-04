@@ -1,4 +1,4 @@
-//! # icloud2hugo
+//! # icloudAlbum2hugo
 //! 
 //! A command-line tool that syncs photos from iCloud Shared Albums to a Hugo site.
 //! 
@@ -34,7 +34,7 @@ use icloud::fetch_album;
 use log::{info, debug};
 
 #[derive(Parser)]
-#[command(author, version, about = "A tool to sync photos from iCloud to Hugo")]
+#[command(author, version, about = "A tool to sync photos from iCloud Shared Albums to Hugo")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
         .format_timestamp(Some(env_logger::fmt::TimestampPrecision::Seconds))
         .init();
     
-    info!("Starting icloud2hugo");
+    info!("Starting icloudAlbum2hugo");
     debug!("Initialized logger");
     
     let cli = Cli::parse();
@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
                 .context("Failed to load configuration")?;
             
             println!("┌─────────────────────────────────────────────┐");
-            println!("│           icloud2hugo Photo Sync            │");
+            println!("│        icloudAlbum2hugo Photo Sync         │");
             println!("└─────────────────────────────────────────────┘");
             
             println!("\n📋 Configuration:");
@@ -187,7 +187,7 @@ async fn main() -> Result<()> {
                 .context("Failed to load configuration")?;
                 
             println!("┌─────────────────────────────────────────────┐");
-            println!("│               icloud2hugo Status             │");
+            println!("│            icloudAlbum2hugo Status          │");
             println!("└─────────────────────────────────────────────┘");
             
             // Display configuration summary
@@ -339,7 +339,7 @@ async fn main() -> Result<()> {
                 if new_ids.is_empty() && update_count == 0 && removed_ids.is_empty() {
                     println!("  ✅ Everything is up to date! No action needed.");
                 } else {
-                    println!("  • Run 'icloud2hugo sync' to update your local files");
+                    println!("  • Run 'icloudAlbum2hugo sync' to update your local files");
                 }
             } else {
                 // ------- LOCAL-ONLY SUMMARY -------
@@ -391,7 +391,7 @@ fn load_config(config_path_opt: &Option<PathBuf>) -> Result<Config> {
     
     if !config_path.exists() {
         anyhow::bail!(
-            "Config file not found at {}.\nRun 'icloud2hugo init' to create one.",
+            "Config file not found at {}.\nRun 'icloudAlbum2hugo init' to create one.",
             config_path.display()
         );
     }
