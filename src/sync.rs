@@ -32,6 +32,7 @@ pub struct Syncer {
     /// Base directory for storing photos
     content_dir: PathBuf,
     /// Path to the index file
+    #[allow(dead_code)]
     index_path: PathBuf,
 }
 
@@ -224,6 +225,7 @@ impl Syncer {
     }
 
     /// Saves the photo index
+    #[allow(dead_code)]
     pub fn save_index(&self, index: &PhotoIndex) -> Result<()> {
         index.save(&self.index_path)
     }

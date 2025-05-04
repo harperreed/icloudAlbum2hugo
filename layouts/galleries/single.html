@@ -1,0 +1,59 @@
+{{ define "main" }}
+<div class="gallery">
+  <h1>{{ .Title }}</h1>
+  
+  {{ with .Params.description }}
+    <p class="description">{{ . }}</p>
+  {{ end }}
+  
+  <div class="gallery-grid">
+    {{ range .Resources.Match "*.jpg" }}
+      {{ $image := . }}
+      {{ $thumbnail := $image.Resize "400x" }}
+      <div class="gallery-item">
+        <a href="{{ $image.RelPermalink }}">
+          <img src="{{ $thumbnail.RelPermalink }}" 
+               alt="{{ with $image.Params.caption }}{{ . }}{{ else }}{{ $image.Name }}{{ end }}" 
+               loading="lazy">
+        </a>
+        {{ with $image.Params.caption }}
+          <p class="caption">{{ . }}</p>
+        {{ end }}
+      </div>
+    {{ end }}
+  </div>
+</div>
+
+<style>
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-gap: 1rem;
+}
+
+.gallery-item {
+  transition: transform 0.3s ease;
+}
+
+.gallery-item:hover {
+  transform: scale(1.03);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  aspect-ratio: 1;
+}
+
+.caption {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.description {
+  margin-bottom: 2rem;
+}
+</style>
+{{ end }}

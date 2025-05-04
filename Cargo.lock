@@ -761,7 +761,7 @@ dependencies = [
 
 [[package]]
 name = "icloudAlbum2hugo"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -780,6 +780,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "slugify",
  "tempfile",
  "tokio",
  "url",
@@ -1598,6 +1599,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "slugify"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6b8cf203d2088b831d7558f8e5151bfa420c57a34240b28cee29d0ae5f2ac8b"
+dependencies = [
+ "unidecode",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1826,6 +1836,12 @@ name = "unicode-ident"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5f39404a5da50712a4c1eecf25e90dd62b613502b7e925fd4e4d19b5c96512"
+
+[[package]]
+name = "unidecode"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "402bb19d8e03f1d1a7450e2bd613980869438e0666331be3e073089124aa1adc"
 
 [[package]]
 name = "unsafe-libyaml"

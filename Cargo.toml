@@ -1,6 +1,6 @@
 [package]
 name = "icloudAlbum2hugo"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 authors = ["Harper Reed <harper@harper.website>"]
 description = "A command-line tool that syncs photos from iCloud Shared Albums to a Hugo site"
@@ -28,6 +28,7 @@ rand = "0.8"
 md5 = "0.7"
 log = "0.4"
 env_logger = "0.10"
+slugify = "0.1.0"
 
 [dev-dependencies]
 assert_cmd = "2.0"
