@@ -8,6 +8,7 @@
 //! - Basic metadata (filename, dimensions, etc.)
 //! - EXIF data (camera info, date/time, GPS coordinates)
 //! - Location information from reverse geocoding
+//! - Gallery information for organizing photos into collections
 //!
 //! This allows the application to efficiently determine which photos need
 //! to be added, updated, or removed during synchronization.
@@ -20,6 +21,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::geocode::Location;
+
+/// Default MIME type for backward compatibility
+fn default_mime_type() -> String {
+    "image/jpeg".to_string()
+}
 
 /// Represents a stored photo's metadata in our local index
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +50,9 @@ pub struct IndexedPhoto {
     pub last_sync: DateTime<Utc>,
     /// Local path to the photo
     pub local_path: PathBuf,
+    /// MIME type of the photo (e.g., "image/jpeg", "image/png")
+    #[serde(default = "default_mime_type")]
+    pub mime_type: String,
 
     // EXIF metadata
     /// Make of the camera used (e.g., "Apple")
@@ -74,6 +83,56 @@ pub struct IndexedPhoto {
     pub location: Option<Location>,
 }
 
+/// Represents a gallery collection of photos
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Gallery {
+    /// Unique identifier for the gallery
+    pub id: String,
+    /// Display name for the gallery
+    pub name: String,
+    /// URL-friendly name for the gallery directory
+    pub slug: String,
+    /// Optional description of the gallery
+    pub description: Option<String>,
+    /// List of photo GUIDs included in this gallery
+    pub photos: Vec<String>,
+    /// When the gallery was created
+    pub created_at: DateTime<Utc>,
+    /// When the gallery was last updated
+    pub updated_at: DateTime<Utc>,
+}
+
+impl Gallery {
+    /// Creates a new gallery with the given name
+    pub fn new(id: String, name: String, slug: String, description: Option<String>) -> Self {
+        Self {
+            id,
+            name,
+            slug,
+            description,
+            photos: Vec::new(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    /// Adds a photo to the gallery
+    pub fn add_photo(&mut self, guid: String) {
+        if !self.photos.contains(&guid) {
+            self.photos.push(guid);
+            self.updated_at = Utc::now();
+        }
+    }
+
+    /// Removes a photo from the gallery
+    pub fn remove_photo(&mut self, guid: &str) {
+        if let Some(index) = self.photos.iter().position(|p| p == guid) {
+            self.photos.remove(index);
+            self.updated_at = Utc::now();
+        }
+    }
+}
+
 /// Represents our local database of photos
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhotoIndex {
@@ -81,6 +140,8 @@ pub struct PhotoIndex {
     pub last_updated: DateTime<Utc>,
     /// Map of photo GUIDs to indexed photos
     pub photos: HashMap<String, IndexedPhoto>,
+    /// Map of gallery IDs to galleries
+    pub galleries: HashMap<String, Gallery>,
 }
 
 impl IndexedPhoto {
@@ -97,6 +158,24 @@ impl IndexedPhoto {
         height: u32,
         local_path: PathBuf,
     ) -> Self {
+        // Determine MIME type from filename if possible
+        let mime_type = if filename.ends_with(".jpg") || filename.ends_with(".jpeg") {
+            "image/jpeg".to_string()
+        } else if filename.ends_with(".png") {
+            "image/png".to_string()
+        } else if filename.ends_with(".heic") {
+            "image/heic".to_string()
+        } else if filename.ends_with(".gif") {
+            "image/gif".to_string()
+        } else if filename.ends_with(".webp") {
+            "image/webp".to_string()
+        } else if filename.ends_with(".mp4") || filename.ends_with(".mov") {
+            "video/mp4".to_string()
+        } else {
+            // Default to JPEG if we can't determine the type
+            "image/jpeg".to_string()
+        };
+
         Self {
             guid,
             filename,
@@ -108,6 +187,7 @@ impl IndexedPhoto {
             height,
             last_sync: Utc::now(),
             local_path,
+            mime_type,
             camera_make: None,
             camera_model: None,
             exif_date_time: None,
@@ -150,6 +230,7 @@ impl PhotoIndex {
         Self {
             last_updated: Utc::now(),
             photos: HashMap::new(),
+            galleries: HashMap::new(),
         }
     }
 
@@ -199,6 +280,12 @@ impl PhotoIndex {
 
     /// Remove a photo from the index
     pub fn remove_photo(&mut self, guid: &str) -> Option<IndexedPhoto> {
+        // Remove photo from all galleries
+        for gallery in self.galleries.values_mut() {
+            gallery.remove_photo(guid);
+        }
+
+        // Remove from photos collection
         let result = self.photos.remove(guid);
         if result.is_some() {
             self.last_updated = Utc::now();
@@ -214,6 +301,45 @@ impl PhotoIndex {
     /// Number of photos in the index
     pub fn photo_count(&self) -> usize {
         self.photos.len()
+    }
+
+    /// Add a new gallery or update an existing one
+    pub fn add_or_update_gallery(&mut self, gallery: Gallery) {
+        self.galleries.insert(gallery.id.clone(), gallery);
+        self.last_updated = Utc::now();
+    }
+
+    /// Remove a gallery from the index
+    #[allow(dead_code)]
+    pub fn remove_gallery(&mut self, id: &str) -> Option<Gallery> {
+        let result = self.galleries.remove(id);
+        if result.is_some() {
+            self.last_updated = Utc::now();
+        }
+        result
+    }
+
+    /// Get a gallery by ID
+    pub fn get_gallery(&self, id: &str) -> Option<&Gallery> {
+        self.galleries.get(id)
+    }
+
+    /// Number of galleries in the index
+    pub fn gallery_count(&self) -> usize {
+        self.galleries.len()
+    }
+
+    /// Get all photos in a gallery
+    pub fn get_gallery_photos(&self, gallery_id: &str) -> Vec<&IndexedPhoto> {
+        if let Some(gallery) = self.galleries.get(gallery_id) {
+            gallery
+                .photos
+                .iter()
+                .filter_map(|guid| self.photos.get(guid))
+                .collect()
+        } else {
+            Vec::new()
+        }
     }
 }
 

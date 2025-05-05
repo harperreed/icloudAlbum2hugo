@@ -20,6 +20,7 @@
 pub mod api_debug;
 pub mod config;
 pub mod exif;
+pub mod gallery;
 pub mod geocode;
 pub mod icloud;
 pub mod index;
@@ -49,7 +50,7 @@ mod tests {
     #[test]
     fn test_config_generation() -> Result<(), Box<dyn Error>> {
         let temp_dir = TempDir::new()?;
-        let config_path = temp_dir.path().join("config.yaml");
+        let config_path = temp_dir.path().join("icloudalbums.yaml");
 
         // Create a config file with init command
         let mut cmd = cargo_bin();
@@ -63,6 +64,7 @@ mod tests {
 
         // Read the config file content
         let content = fs::read_to_string(&config_path)?;
+        assert!(content.contains("outputs"), "Config should contain outputs");
         assert!(
             content.contains("album_url"),
             "Config should contain album_url"
@@ -79,10 +81,10 @@ mod tests {
     #[test]
     fn test_init_command_with_force() -> Result<(), Box<dyn Error>> {
         let temp_dir = TempDir::new()?;
-        let config_path = temp_dir.path().join("config.yaml");
+        let config_path = temp_dir.path().join("icloudalbums.yaml");
 
         // Create initial config
-        let initial_content = "album_url: initial";
+        let initial_content = "outputs: []";
         fs::write(&config_path, initial_content)?;
 
         // Run init command without force (should not overwrite)
@@ -122,6 +124,10 @@ mod tests {
             "Content should be changed with --force"
         );
         assert!(
+            new_content.contains("outputs"),
+            "New config should contain outputs"
+        );
+        assert!(
             new_content.contains("album_url"),
             "New config should contain album_url"
         );
@@ -151,14 +157,17 @@ mod tests {
     #[test]
     fn test_sync_command() -> Result<(), Box<dyn Error>> {
         let temp_dir = TempDir::new()?;
-        let config_path = temp_dir.path().join("config.yaml");
+        let config_path = temp_dir.path().join("icloudalbums.yaml");
 
         // Create config file
         let config_content = r#"
-album_url: "https://www.icloud.com/sharedalbum/#test123"
-out_dir: "content/photostream" 
-data_file: "data/photos/index.yaml"
 fuzz_meters: 100.0
+outputs:
+  - output_type: photostream
+    album_url: "https://www.icloud.com/sharedalbum/#test123"
+    out_dir: "content/photostream" 
+    data_file: "data/photos/index.yaml"
+    enabled: true
 "#;
         fs::write(&config_path, config_content)?;
 
@@ -180,14 +189,17 @@ fuzz_meters: 100.0
     #[test]
     fn test_status_command() -> Result<(), Box<dyn Error>> {
         let temp_dir = TempDir::new()?;
-        let config_path = temp_dir.path().join("config.yaml");
+        let config_path = temp_dir.path().join("icloudalbums.yaml");
 
         // Create config file
         let config_content = r#"
-album_url: "https://www.icloud.com/sharedalbum/#test123"
-out_dir: "content/photostream"
-data_file: "data/photos/index.yaml" 
 fuzz_meters: 100.0
+outputs:
+  - output_type: photostream
+    album_url: "https://www.icloud.com/sharedalbum/#test123"
+    out_dir: "content/photostream"
+    data_file: "data/photos/index.yaml" 
+    enabled: true
 "#;
         fs::write(&config_path, config_content)?;
 
@@ -221,7 +233,7 @@ fuzz_meters: 100.0
     #[test]
     fn test_status_command_with_data() -> Result<(), Box<dyn Error>> {
         let temp_dir = TempDir::new()?;
-        let config_path = temp_dir.path().join("config.yaml");
+        let config_path = temp_dir.path().join("icloudalbums.yaml");
         let data_dir = temp_dir.path().join("data").join("photos");
         let index_path = data_dir.join("index.yaml");
 
@@ -231,10 +243,13 @@ fuzz_meters: 100.0
         // Create config file
         let config_content = format!(
             r#"
-album_url: "https://www.icloud.com/sharedalbum/#test123"
-out_dir: "{}/content/photostream"
-data_file: "{}"
 fuzz_meters: 100.0
+outputs:
+  - output_type: photostream
+    album_url: "https://www.icloud.com/sharedalbum/#test123"
+    out_dir: "{}/content/photostream"
+    data_file: "{}"
+    enabled: true
 "#,
             temp_dir.path().display(),
             index_path.display()
@@ -272,6 +287,7 @@ photos:
       city: "Chicago"
       state: "Illinois"
       country: "United States"
+galleries: {}
 "#;
         fs::write(&index_path, index_content)?;
 
@@ -311,10 +327,13 @@ photos:
 
         // Create config at custom path
         let config_content = r#"
-album_url: "https://www.icloud.com/sharedalbum/#custom123"
-out_dir: "custom/path"
-data_file: "custom/data.yaml"
 fuzz_meters: 50.0
+outputs:
+  - output_type: photostream
+    album_url: "https://www.icloud.com/sharedalbum/#custom123"
+    out_dir: "custom/path"
+    data_file: "custom/data.yaml"
+    enabled: true
 "#;
         fs::write(&custom_path, config_content)?;
 

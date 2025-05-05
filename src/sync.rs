@@ -25,6 +25,40 @@ use crate::geocode::create_geocoding_service;
 use crate::icloud::{Album, Photo};
 use crate::index::{IndexedPhoto, PhotoIndex};
 
+/// Format a photo title using date, location, and camera information
+pub fn format_photo_title(photo: &IndexedPhoto) -> String {
+    // Get the date to use for display - prefer EXIF date if available, fallback to creation date
+    let display_date = photo.exif_date_time.unwrap_or(photo.created_at);
+
+    // Format the date (January 1, 2023)
+    let formatted_date = display_date.format("%B %e, %Y").to_string();
+
+    // Start with the date
+    let mut title_parts = vec![formatted_date];
+
+    // Add location if available
+    if let Some(ref location) = photo.location {
+        if let Some(ref city) = location.city {
+            title_parts.push(city.clone());
+        } else {
+            title_parts.push(location.formatted_address.clone());
+        }
+    }
+
+    // Add camera information if available
+    if let (Some(make), Some(model)) = (&photo.camera_make, &photo.camera_model) {
+        let camera = format!("{} {}", make.trim(), model.trim());
+        title_parts.push(camera);
+    } else if let Some(model) = &photo.camera_model {
+        title_parts.push(model.clone());
+    } else if let Some(make) = &photo.camera_make {
+        title_parts.push(make.clone());
+    }
+
+    // Join the parts with commas
+    title_parts.join(", ")
+}
+
 /// Responsible for syncing photos from iCloud to the local filesystem
 pub struct Syncer {
     /// HTTP client for downloading photos
@@ -32,6 +66,7 @@ pub struct Syncer {
     /// Base directory for storing photos
     content_dir: PathBuf,
     /// Path to the index file
+    #[allow(dead_code)]
     index_path: PathBuf,
 }
 
@@ -106,17 +141,8 @@ impl TaskSyncer {
 
     /// Creates an index.md file with frontmatter including EXIF data (task-local version)
     async fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
-        // Get the date to use for display - prefer EXIF date if available, fallback to creation date
-        let display_date = photo.exif_date_time.unwrap_or(photo.created_at);
-
-        // Format a nice human-readable date for the title (January 1, 2023)
-        let formatted_date = display_date.format("%B %e, %Y").to_string();
-
-        // If there's no caption, use "Photo taken on <formatted_date>"
-        let title = match &photo.caption {
-            Some(caption) if !caption.trim().is_empty() => caption.clone(),
-            _ => format!("Photo taken on {}", formatted_date),
-        };
+        // Generate the photo title using date, location, and camera info
+        let title = format_photo_title(photo);
 
         // Build the frontmatter with EXIF data if available
         let mut frontmatter = format!(
@@ -127,6 +153,7 @@ guid: {}
 original_filename: {}
 width: {}
 height: {}
+mime_type: {}
 ",
             title,
             photo.created_at.format("%Y-%m-%dT%H:%M:%S%z"),
@@ -134,6 +161,7 @@ height: {}
             photo.filename,
             photo.width,
             photo.height,
+            photo.mime_type,
         );
 
         // Add EXIF data if available
@@ -224,6 +252,7 @@ impl Syncer {
     }
 
     /// Saves the photo index
+    #[allow(dead_code)]
     pub fn save_index(&self, index: &PhotoIndex) -> Result<()> {
         index.save(&self.index_path)
     }
@@ -819,17 +848,8 @@ impl Syncer {
     /// Creates an index.md file with frontmatter including EXIF data
     #[allow(dead_code)]
     async fn create_index_md_with_exif(&self, photo: &IndexedPhoto, path: &Path) -> Result<()> {
-        // Get the date to use for display - prefer EXIF date if available, fallback to creation date
-        let display_date = photo.exif_date_time.unwrap_or(photo.created_at);
-
-        // Format a nice human-readable date for the title (January 1, 2023)
-        let formatted_date = display_date.format("%B %e, %Y").to_string();
-
-        // If there's no caption, use "Photo taken on <formatted_date>"
-        let title = match &photo.caption {
-            Some(caption) if !caption.trim().is_empty() => caption.clone(),
-            _ => format!("Photo taken on {}", formatted_date),
-        };
+        // Generate the photo title using date, location, and camera info
+        let title = format_photo_title(photo);
 
         // Build the frontmatter with EXIF data if available
         let mut frontmatter = format!(
@@ -840,6 +860,7 @@ guid: {}
 original_filename: {}
 width: {}
 height: {}
+mime_type: {}
 ",
             title,
             photo.created_at.format("%Y-%m-%dT%H:%M:%S%z"),
@@ -847,6 +868,7 @@ height: {}
             photo.filename,
             photo.width,
             photo.height,
+            photo.mime_type,
         );
 
         // Add EXIF data if available
@@ -944,6 +966,7 @@ mod tests {
             url: format!("https://example.com/{}.jpg", guid),
             width: 800,
             height: 600,
+            mime_type: "image/jpeg".to_string(),
         }
     }
 
@@ -958,6 +981,7 @@ mod tests {
             url: format!("https://example.com/{}.jpg", guid),
             width: 800,
             height: 600,
+            mime_type: "image/jpeg".to_string(),
         }
     }
 
@@ -1255,16 +1279,18 @@ mod tests {
         let photo1_content = fs::read_to_string(photo1_index_path)?;
         let photo2_content = fs::read_to_string(photo2_index_path)?;
 
-        // Check that photo1 (no caption) has a title with "Photo taken on" format
+        // Check that photo titles now use the date format
+        let display_date_pattern =
+            format!("title: {}", chrono::Utc::now().format("%B").to_string()); // Just check for month name
+
         assert!(
-            photo1_content.contains("title: Photo taken on"),
-            "Photo without caption should have title with 'Photo taken on' format"
+            photo1_content.contains(&display_date_pattern),
+            "Photo title should contain formatted date"
         );
 
-        // Check that photo2 (with caption) has the caption as title
         assert!(
-            photo2_content.contains("title: Caption for photo2"),
-            "Photo with caption should use the caption as title"
+            photo2_content.contains(&display_date_pattern),
+            "Photo title should contain formatted date"
         );
 
         Ok(())
