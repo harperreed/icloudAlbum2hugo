@@ -119,7 +119,7 @@ impl GallerySyncer {
 
         // Check all photos in the album
         for (guid, photo) in &album.photos {
-            let photo_path = gallery_dir.join(format!("{}.jpg", guid));
+            let photo_path = gallery_dir.join(format!("{guid}.jpg"));
 
             // Check if the photo exists in our index
             if let Some(indexed_photo) = index.get_photo(guid) {
@@ -163,7 +163,7 @@ impl GallerySyncer {
                 Err(e) => {
                     results.push(SyncResult::Failed(
                         guid,
-                        format!("Failed to process photo: {}", e),
+                        format!("Failed to process photo: {e}"),
                     ));
                 }
             }
@@ -188,7 +188,7 @@ impl GallerySyncer {
                 Err(e) => {
                     results.push(SyncResult::Failed(
                         guid,
-                        format!("Failed to update photo: {}", e),
+                        format!("Failed to update photo: {e}"),
                     ));
                 }
             }
@@ -202,10 +202,10 @@ impl GallerySyncer {
             }
 
             // Try to remove the file
-            let photo_path = gallery_dir.join(format!("{}.jpg", guid));
+            let photo_path = gallery_dir.join(format!("{guid}.jpg"));
             if photo_path.exists() {
                 if let Err(e) = tokio_fs::remove_file(&photo_path).await {
-                    warn!("Failed to delete photo file {}: {}", guid, e);
+                    warn!("Failed to delete photo file {guid}: {e}");
                 }
             }
 
@@ -375,7 +375,7 @@ impl GallerySyncer {
 
         // Add description if available
         if let Some(ref description) = gallery.description {
-            content.push_str(&format!("description: \"{}\"\n", description));
+            content.push_str(&format!("description: \"{description}\"\n"));
         }
 
         // Add photo count
@@ -400,14 +400,14 @@ impl GallerySyncer {
             // Generate a formatted title with date, location, and camera info
             let formatted_title = format_photo_title(photo);
 
-            content.push_str(&format!("  - filename: {}\n", filename));
-            content.push_str(&format!("    caption: \"{}\"\n", formatted_title));
+            content.push_str(&format!("  - filename: {filename}\n"));
+            content.push_str(&format!("    caption: \"{formatted_title}\"\n"));
             content.push_str(&format!("    mime_type: \"{}\"\n", photo.mime_type));
 
             // Add original caption if available
             if let Some(ref caption) = photo.caption {
                 if !caption.trim().is_empty() {
-                    content.push_str(&format!("    original_caption: \"{}\"\n", caption));
+                    content.push_str(&format!("    original_caption: \"{caption}\"\n"));
                 }
             }
 
@@ -421,11 +421,11 @@ impl GallerySyncer {
 
             // Add camera if available
             if let Some(ref make) = photo.camera_make {
-                content.push_str(&format!("    camera_make: \"{}\"\n", make));
+                content.push_str(&format!("    camera_make: \"{make}\"\n"));
             }
 
             if let Some(ref model) = photo.camera_model {
-                content.push_str(&format!("    camera_model: \"{}\"\n", model));
+                content.push_str(&format!("    camera_model: \"{model}\"\n"));
             }
 
             // Add date
@@ -469,16 +469,12 @@ impl GallerySyncer {
             // For videos, use a video shortcode instead of figure
             if photo.mime_type == "video/mp4" {
                 content.push_str(&format!(
-                    "{{{{< video src=\"{}\" caption=\"{}\" >}}}}\n\n",
-                    filename, caption
+                    "{{{{< video src=\"{filename}\" caption=\"{caption}\" >}}}}\n\n"
                 ));
             } else {
                 // Build the figure shortcode for images
                 content.push_str(&format!(
-                    "{{{{< figure\n  src=\"{}\"\n  alt=\"{}\"\n  caption=\"{}\"\n  class=\"ma0 w-75\"\n>}}}}\n\n",
-                    filename,
-                    caption,
-                    caption
+                    "{{{{< figure\n  src=\"{filename}\"\n  alt=\"{caption}\"\n  caption=\"{caption}\"\n  class=\"ma0 w-75\"\n>}}}}\n\n"
                 ));
             }
         }
@@ -531,10 +527,10 @@ mod tests {
         Photo {
             guid: guid.to_string(),
             filename: format!("{}.jpg", guid),
-            caption: Some(format!("Caption for {}", guid)),
+            caption: Some(format!("Caption for {guid}")),
             created_at: Utc::now(),
-            checksum: format!("checksum_{}", guid),
-            url: format!("https://example.com/{}.jpg", guid),
+            checksum: format!("checksum_{guid}"),
+            url: format!("https://example.com/{guid}.jpg"),
             width: 800,
             height: 600,
             mime_type: "image/jpeg".to_string(),

@@ -6,12 +6,12 @@ use url::Url;
 pub async fn debug_album_api(album_url: &str) -> Result<()> {
     // Special handling for test URLs
     if album_url.contains("#test") || album_url.contains("#custom") {
-        println!("Using mock data for test URL: {}", album_url);
+        println!("Using mock data for test URL: {album_url}");
 
         // Create a simple debug output file for test purposes
         let mut debug_output = String::new();
         debug_output.push_str("Mock Album data:\n");
-        debug_output.push_str(&format!("  Album URL: {}\n", album_url));
+        debug_output.push_str(&format!("  Album URL: {album_url}\n"));
         debug_output.push_str("  Photos count: 3\n");
 
         // Save the debug output to a file
@@ -23,7 +23,7 @@ pub async fn debug_album_api(album_url: &str) -> Result<()> {
 
     // Validate and parse the URL
     let url = Url::parse(album_url)
-        .with_context(|| format!("Invalid iCloud shared album URL: {}", album_url))?;
+        .with_context(|| format!("Invalid iCloud shared album URL: {album_url}"))?;
 
     // Extract the token (shared album ID) from the URL
     let token = url
@@ -43,7 +43,7 @@ pub async fn debug_album_api(album_url: &str) -> Result<()> {
     // Use the icloud_album_rs crate to fetch album data
     let album_data = icloud_album_rs::get_icloud_photos(token)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to fetch album: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to fetch album: {e}"))?;
 
     // Since we can't directly serialize the album_data, extract the information manually
     let mut debug_output = String::new();
@@ -77,8 +77,8 @@ pub async fn debug_album_api(album_url: &str) -> Result<()> {
         if !photo.derivatives.is_empty() {
             for (j, (key, value)) in photo.derivatives.iter().enumerate().take(3) {
                 debug_output.push_str(&format!("  Derivative {}:\n", j + 1));
-                debug_output.push_str(&format!("    Key: {}\n", key));
-                debug_output.push_str(&format!("    Value: {:?}\n", value));
+                debug_output.push_str(&format!("    Key: {key}\n"));
+                debug_output.push_str(&format!("    Value: {value:?}\n"));
             }
 
             if photo.derivatives.len() > 3 {

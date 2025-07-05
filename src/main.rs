@@ -39,23 +39,23 @@ use sync::Syncer;
 fn console_log(message: &str, level: log::Level) {
     match level {
         log::Level::Error => {
-            error!("{}", message);
-            println!("❌ {}", message);
+            error!("{message}");
+            println!("❌ {message}");
         }
         log::Level::Warn => {
-            warn!("{}", message);
-            println!("⚠️  {}", message);
+            warn!("{message}");
+            println!("⚠️  {message}");
         }
         log::Level::Info => {
-            info!("{}", message);
-            println!("{}", message);
+            info!("{message}");
+            println!("{message}");
         }
         log::Level::Debug => {
-            debug!("{}", message);
+            debug!("{message}");
             // No console output for debug messages
         }
         log::Level::Trace => {
-            log::trace!("{}", message);
+            log::trace!("{message}");
             // No console output for trace messages
         }
     }
@@ -166,7 +166,7 @@ async fn main() -> Result<()> {
                         });
 
                 println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                println!("🔄 Processing output: {}", output_name);
+                println!("🔄 Processing output: {output_name}");
                 println!("  • Type: {:?}", output_config.output_type);
                 println!("  • Album URL: {}", output_config.album_url);
                 println!("  • Output directory: {}", output_config.out_dir);
@@ -188,7 +188,7 @@ async fn main() -> Result<()> {
                         index
                     }
                     Err(err) => {
-                        eprintln!("  ⚠️  Warning: Could not load photo index: {}", err);
+                        eprintln!("  ⚠️  Warning: Could not load photo index: {err}");
                         println!("  ℹ️  Creating new empty index");
                         index::PhotoIndex::new()
                     }
@@ -206,7 +206,7 @@ async fn main() -> Result<()> {
                         album
                     }
                     Err(err) => {
-                        eprintln!("  ⚠️  Error: Failed to fetch album data: {}", err);
+                        eprintln!("  ⚠️  Error: Failed to fetch album data: {err}");
                         println!("  ℹ️  Skipping this output and continuing with others");
                         continue;
                     }
@@ -257,7 +257,7 @@ async fn main() -> Result<()> {
                         sync::SyncResult::Unchanged(_) => unchanged += 1,
                         sync::SyncResult::Deleted(_) => deleted += 1,
                         sync::SyncResult::Failed(guid, error) => {
-                            eprintln!("  ⚠️  Failed to sync photo {}: {}", guid, error);
+                            eprintln!("  ⚠️  Failed to sync photo {guid}: {error}");
                             failed += 1;
                         }
                     }
@@ -268,7 +268,7 @@ async fn main() -> Result<()> {
                 match photo_index.save(&data_file_path) {
                     Ok(_) => println!("  • Photo index saved successfully"),
                     Err(err) => {
-                        eprintln!("  ⚠️  Warning: Failed to save photo index: {}", err);
+                        eprintln!("  ⚠️  Warning: Failed to save photo index: {err}");
                         eprintln!(
                             "  ℹ️  Your changes have been applied but not saved to the index file"
                         );
@@ -276,13 +276,13 @@ async fn main() -> Result<()> {
                 }
 
                 // ------- PRINT SUMMARY -------
-                println!("\n✅ Sync completed for {}", output_name);
-                println!("  • Added: {}", added);
-                println!("  • Updated: {}", updated);
-                println!("  • Unchanged: {}", unchanged);
-                println!("  • Deleted: {}", deleted);
+                println!("\n✅ Sync completed for {output_name}");
+                println!("  • Added: {added}");
+                println!("  • Updated: {updated}");
+                println!("  • Unchanged: {unchanged}");
+                println!("  • Deleted: {deleted}");
                 if failed > 0 {
-                    println!("  • Failed: {} (see warnings above)", failed);
+                    println!("  • Failed: {failed} (see warnings above)");
                 }
                 println!("  • Total photos in index: {}", photo_index.photo_count());
             }
@@ -328,7 +328,7 @@ async fn main() -> Result<()> {
                         });
 
                 println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                println!("🔍 Checking output: {}", output_name);
+                println!("🔍 Checking output: {output_name}");
                 println!("  • Type: {:?}", output_config.output_type);
                 println!("  • Album URL: {}", output_config.album_url);
                 println!("  • Output directory: {}", output_config.out_dir);
@@ -349,7 +349,7 @@ async fn main() -> Result<()> {
                         index
                     }
                     Err(err) => {
-                        eprintln!("  ⚠️  Warning: Could not load photo index: {}", err);
+                        eprintln!("  ⚠️  Warning: Could not load photo index: {err}");
                         println!("  ℹ️  Using empty index instead");
                         index::PhotoIndex::new()
                     }
@@ -419,8 +419,8 @@ async fn main() -> Result<()> {
                         Some(album)
                     }
                     Err(err) => {
-                        eprintln!("  ⚠️  Warning: Could not fetch album: {}", err);
-                        eprintln!("    Error details: {}", err);
+                        eprintln!("  ⚠️  Warning: Could not fetch album: {err}");
+                        eprintln!("    Error details: {err}");
                         println!("  ℹ️  Status will only show local information");
                         None
                     }
@@ -459,12 +459,12 @@ async fn main() -> Result<()> {
                     }
 
                     // ------- DISPLAY STATUS SUMMARY -------
-                    println!("\n📊 Status Summary for {}:", output_name);
+                    println!("\n📊 Status Summary for {output_name}:");
                     println!("  • Local photos: {}", photo_index.photos.len());
                     println!("  • Remote photos: {}", album.photos.len());
                     println!("  • Photos in sync: {}", common_ids.len() - update_count);
                     println!("  • New photos to download: {}", new_ids.len());
-                    println!("  • Photos to update: {}", update_count);
+                    println!("  • Photos to update: {update_count}");
                     println!("  • Photos to remove: {}", removed_ids.len());
 
                     // Show detailed information if requested
@@ -542,7 +542,7 @@ async fn main() -> Result<()> {
                     }
                 } else {
                     // ------- LOCAL-ONLY SUMMARY -------
-                    println!("\n📊 Status Summary for {} (local only):", output_name);
+                    println!("\n📊 Status Summary for {output_name} (local only):");
                     println!("  • Local photos: {}", photo_index.photos.len());
                     if photo_index.photo_count() > 0 {
                         println!("  • Last updated: {}", photo_index.last_updated);
