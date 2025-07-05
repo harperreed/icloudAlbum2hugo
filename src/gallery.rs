@@ -642,12 +642,13 @@ mod tests {
         let index_path = temp_dir.path().join("index.yaml");
 
         // Create privacy config with all settings enabled
-        let mut privacy_config = PrivacyConfig::default();
-        privacy_config.nofeed = true;
-        privacy_config.noindex = true;
-        privacy_config.uuid_slug = true;
-        privacy_config.unlisted = true;
-        privacy_config.robots_noindex = true;
+        let privacy_config = PrivacyConfig {
+            nofeed: true,
+            noindex: true,
+            uuid_slug: true,
+            unlisted: true,
+            robots_noindex: true,
+        };
 
         // Create the test gallery syncer with privacy settings
         let gallery_syncer = GallerySyncer::new(

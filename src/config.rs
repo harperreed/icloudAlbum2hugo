@@ -299,15 +299,19 @@ fuzz_meters: 50.0
         let mut config = Config::default();
 
         // Add a second disabled output
-        let mut second_output = OutputConfig::default();
-        second_output.album_url = "https://example.com/album2".to_string();
-        second_output.enabled = false;
+        let second_output = OutputConfig {
+            album_url: "https://example.com/album2".to_string(),
+            enabled: false,
+            ..Default::default()
+        };
         config.outputs.push(second_output);
 
         // Add a third enabled output
-        let mut third_output = OutputConfig::default();
-        third_output.album_url = "https://example.com/album3".to_string();
-        third_output.name = Some("Third Album".to_string());
+        let third_output = OutputConfig {
+            album_url: "https://example.com/album3".to_string(),
+            name: Some("Third Album".to_string()),
+            ..Default::default()
+        };
         config.outputs.push(third_output);
 
         // Check that only enabled outputs are returned
@@ -337,9 +341,11 @@ fuzz_meters: 50.0
 
     #[test]
     fn test_privacy_config_serialization() -> Result<()> {
-        let mut privacy = PrivacyConfig::default();
-        privacy.nofeed = true;
-        privacy.uuid_slug = true;
+        let privacy = PrivacyConfig {
+            nofeed: true,
+            uuid_slug: true,
+            ..Default::default()
+        };
 
         let yaml = serde_yaml::to_string(&privacy)?;
         let deserialized: PrivacyConfig = serde_yaml::from_str(&yaml)?;

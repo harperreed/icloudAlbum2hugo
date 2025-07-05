@@ -12,7 +12,6 @@ use icloudAlbum2hugo::index::{Gallery, PhotoIndex};
 
 use chrono::Utc;
 use tempfile::tempdir;
-use tokio;
 
 /// Create a test photo with the given ID
 fn create_test_photo(guid: &str) -> Photo {
@@ -94,13 +93,15 @@ fn test_multi_output_configuration() {
     let mut config = Config::default();
 
     // Add a gallery output
-    let mut gallery_output = OutputConfig::default();
-    gallery_output.output_type = OutputType::Gallery;
-    gallery_output.album_url = "https://example.com/gallery".to_string();
-    gallery_output.out_dir = "content/gallery".to_string();
-    gallery_output.data_file = "data/gallery.yaml".to_string();
-    gallery_output.name = Some("Test Gallery".to_string());
-    gallery_output.description = Some("Test Description".to_string());
+    let gallery_output = OutputConfig {
+        output_type: OutputType::Gallery,
+        album_url: "https://example.com/gallery".to_string(),
+        out_dir: "content/gallery".to_string(),
+        data_file: "data/gallery.yaml".to_string(),
+        name: Some("Test Gallery".to_string()),
+        description: Some("Test Description".to_string()),
+        ..Default::default()
+    };
 
     config.outputs.push(gallery_output);
 
@@ -251,9 +252,11 @@ async fn test_gallery_with_privacy_settings() -> anyhow::Result<()> {
     let album = create_test_album("Privacy Test Album", 2);
 
     // Create privacy config with some settings enabled
-    let mut privacy_config = PrivacyConfig::default();
-    privacy_config.nofeed = true;
-    privacy_config.uuid_slug = true;
+    let privacy_config = PrivacyConfig {
+        nofeed: true,
+        uuid_slug: true,
+        ..Default::default()
+    };
 
     // Create a gallery syncer with privacy settings
     let gallery_syncer = GallerySyncer::new(

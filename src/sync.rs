@@ -1280,8 +1280,7 @@ mod tests {
         let photo2_content = fs::read_to_string(photo2_index_path)?;
 
         // Check that photo titles now use the date format
-        let display_date_pattern =
-            format!("title: {}", chrono::Utc::now().format("%B").to_string()); // Just check for month name
+        let display_date_pattern = format!("title: {}", chrono::Utc::now().format("%B")); // Just check for month name
 
         assert!(
             photo1_content.contains(&display_date_pattern),

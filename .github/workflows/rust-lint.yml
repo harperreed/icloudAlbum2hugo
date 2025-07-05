@@ -32,6 +32,8 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Clippy check
         # Node-16 compliant release
         uses: actions-rs/clippy-check@v1.0.5

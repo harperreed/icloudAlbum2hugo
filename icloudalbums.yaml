@@ -1,0 +1,16 @@
+fuzz_meters: 100.0
+outputs:
+  - output_type: photostream
+    album_url: https://www.icloud.com/sharedalbum/ALBUM_TOKEN_GOES_HERE
+    out_dir: content/photostream
+    data_file: data/photos/index.yaml
+    name: null
+    description: null
+    enabled: false
+  - output_type: gallery
+    album_url: https://www.icloud.com/sharedalbum/#B2T55Z2WMJdMJM
+    out_dir: content/galleries/my_gallery
+    data_file: data/photos/gallery.yaml
+    name: Japan Summer 2025
+    description: A collection of photos from Japan Summer 2025
+    enabled: true
