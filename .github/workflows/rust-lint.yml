@@ -32,10 +32,9 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
-
       - name: Clippy check
-        uses: actions-rs/clippy-check@v1
+        # Node-16 compliant release
+        uses: actions-rs/clippy-check@v1.0.5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: -- -D warnings
