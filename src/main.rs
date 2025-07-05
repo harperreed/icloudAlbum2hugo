@@ -234,6 +234,7 @@ async fn main() -> Result<()> {
                             output_config.name.clone(),
                             output_config.description.clone(),
                             data_file_path.clone(),
+                            output_config.privacy.clone(),
                         );
                         gallery_syncer
                             .sync_gallery(&album, &mut photo_index)
@@ -592,6 +593,7 @@ fn init_config(config_path_opt: &Option<PathBuf>, force: bool) -> Result<()> {
         name: Some("My Gallery".to_string()), // Optional - will use album name if not provided
         description: Some("A collection of photos from my album".to_string()), // Optional
         enabled: false,                       // Disabled by default
+        privacy: config::PrivacyConfig::default(), // Default privacy settings
     };
 
     config.outputs.push(gallery_example);
@@ -602,9 +604,10 @@ fn init_config(config_path_opt: &Option<PathBuf>, force: bool) -> Result<()> {
         album_url: "https://www.icloud.com/sharedalbum/ANOTHER_GALLERY_TOKEN".to_string(),
         out_dir: "content/galleries/simple_gallery".to_string(),
         data_file: "data/photos/simple_gallery.yaml".to_string(),
-        name: None,        // Will use album name from iCloud
-        description: None, // No description needed
-        enabled: false,    // Disabled by default
+        name: None,                                // Will use album name from iCloud
+        description: None,                         // No description needed
+        enabled: false,                            // Disabled by default
+        privacy: config::PrivacyConfig::default(), // Default privacy settings
     };
 
     config.outputs.push(minimal_gallery_example);

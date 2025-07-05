@@ -165,7 +165,7 @@ fuzz_meters: 100.0
 outputs:
   - output_type: photostream
     album_url: "https://www.icloud.com/sharedalbum/#test123"
-    out_dir: "content/photostream" 
+    out_dir: "content/photostream"
     data_file: "data/photos/index.yaml"
     enabled: true
 "#;
@@ -198,7 +198,7 @@ outputs:
   - output_type: photostream
     album_url: "https://www.icloud.com/sharedalbum/#test123"
     out_dir: "content/photostream"
-    data_file: "data/photos/index.yaml" 
+    data_file: "data/photos/index.yaml"
     enabled: true
 "#;
         fs::write(&config_path, config_content)?;
@@ -282,7 +282,7 @@ photos:
     exposure_time: "1/100"
     f_number: 2.8
     focal_length: 28.0
-    location: 
+    location:
       formatted_address: "Chicago, IL, USA"
       city: "Chicago"
       state: "Illinois"

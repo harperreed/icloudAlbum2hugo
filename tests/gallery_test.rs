@@ -5,7 +5,7 @@
 //! - Multi-output configuration
 //! - Gallery syncing process
 
-use icloudAlbum2hugo::config::{Config, OutputConfig, OutputType};
+use icloudAlbum2hugo::config::{Config, OutputConfig, OutputType, PrivacyConfig};
 use icloudAlbum2hugo::gallery::GallerySyncer;
 use icloudAlbum2hugo::icloud::{Album, Photo};
 use icloudAlbum2hugo::index::{Gallery, PhotoIndex};
@@ -142,6 +142,7 @@ async fn test_gallery_syncing() -> anyhow::Result<()> {
         Some("Test Gallery".to_string()),
         Some("Test Description".to_string()),
         index_path.clone(),
+        PrivacyConfig::default(),
     );
 
     // Create a photo index
@@ -234,6 +235,65 @@ fuzz_meters: 50.0
     assert_eq!(output.out_dir, "content/legacy");
     assert_eq!(output.data_file, "data/legacy.yaml");
     assert!(output.enabled);
+
+    Ok(())
+}
+
+/// Test gallery with privacy settings
+#[tokio::test]
+async fn test_gallery_with_privacy_settings() -> anyhow::Result<()> {
+    // Create a temporary directory for the test
+    let temp_dir = tempdir()?;
+    let content_dir = temp_dir.path().join("content");
+    let index_path = temp_dir.path().join("index.yaml");
+
+    // Create a test album
+    let album = create_test_album("Privacy Test Album", 2);
+
+    // Create privacy config with some settings enabled
+    let mut privacy_config = PrivacyConfig::default();
+    privacy_config.nofeed = true;
+    privacy_config.uuid_slug = true;
+
+    // Create a gallery syncer with privacy settings
+    let gallery_syncer = GallerySyncer::new(
+        content_dir.clone(),
+        Some("Privacy Gallery".to_string()),
+        Some("Test gallery with privacy".to_string()),
+        index_path.clone(),
+        privacy_config,
+    );
+
+    // Create a photo index
+    let mut index = PhotoIndex::new();
+
+    // Sync the gallery
+    let results = gallery_syncer.sync_gallery(&album, &mut index).await?;
+
+    // Verify results
+    assert_eq!(results.len(), 2);
+
+    // Verify files were created
+    assert!(content_dir.join("photo1.jpg").exists());
+    assert!(content_dir.join("photo2.jpg").exists());
+    assert!(content_dir.join("index.md").exists());
+
+    // Read the generated frontmatter
+    let content = std::fs::read_to_string(content_dir.join("index.md"))?;
+
+    // Verify privacy settings are in frontmatter
+    assert!(content.contains("nofeed: true"));
+    assert!(content.contains("uuid: "));
+    assert!(content.contains("slug: "));
+
+    // Verify that disabled privacy settings are not present
+    assert!(!content.contains("noindex: true"));
+    assert!(!content.contains("unlisted: true"));
+
+    // Verify gallery has UUID
+    let gallery = index.galleries.values().next().unwrap();
+    assert!(!gallery.uuid.is_empty());
+    assert!(gallery.uuid.len() > 10);
 
     Ok(())
 }

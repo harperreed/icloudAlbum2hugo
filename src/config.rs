@@ -43,6 +43,25 @@ impl Default for OutputType {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct PrivacyConfig {
+    /// Whether to exclude from RSS feeds
+    #[serde(default)]
+    pub nofeed: bool,
+    /// Whether to exclude from search engine indexing
+    #[serde(default)]
+    pub noindex: bool,
+    /// Whether to use UUID-based slugs instead of human-readable ones
+    #[serde(default)]
+    pub uuid_slug: bool,
+    /// Whether to mark as unlisted (not shown in listings)
+    #[serde(default)]
+    pub unlisted: bool,
+    /// Whether to add robots meta tag with noindex, nofollow
+    #[serde(default)]
+    pub robots_noindex: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OutputConfig {
     /// Type of output (photostream or gallery)
@@ -61,6 +80,9 @@ pub struct OutputConfig {
     /// Whether this output is enabled
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+    /// Privacy settings for Hugo frontmatter
+    #[serde(default)]
+    pub privacy: PrivacyConfig,
 }
 
 fn default_enabled() -> bool {
@@ -77,6 +99,7 @@ impl Default for OutputConfig {
             name: None,
             description: None,
             enabled: true,
+            privacy: PrivacyConfig::default(),
         }
     }
 }
@@ -143,6 +166,7 @@ impl Config {
                     name: None,
                     description: None,
                     enabled: true,
+                    privacy: PrivacyConfig::default(),
                 }];
             }
         }
@@ -296,6 +320,51 @@ fuzz_meters: 50.0
         let named = config.get_outputs_by_name(&["Third Album".to_string()]);
         assert_eq!(named.len(), 1);
         assert_eq!(named[0].album_url, "https://example.com/album3");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_privacy_config_default() {
+        let privacy = PrivacyConfig::default();
+
+        assert!(!privacy.nofeed);
+        assert!(!privacy.noindex);
+        assert!(!privacy.uuid_slug);
+        assert!(!privacy.unlisted);
+        assert!(!privacy.robots_noindex);
+    }
+
+    #[test]
+    fn test_privacy_config_serialization() -> Result<()> {
+        let mut privacy = PrivacyConfig::default();
+        privacy.nofeed = true;
+        privacy.uuid_slug = true;
+
+        let yaml = serde_yaml::to_string(&privacy)?;
+        let deserialized: PrivacyConfig = serde_yaml::from_str(&yaml)?;
+
+        assert!(deserialized.nofeed);
+        assert!(!deserialized.noindex);
+        assert!(deserialized.uuid_slug);
+        assert!(!deserialized.unlisted);
+        assert!(!deserialized.robots_noindex);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_output_config_with_privacy() -> Result<()> {
+        let mut config = OutputConfig::default();
+        config.privacy.nofeed = true;
+        config.privacy.robots_noindex = true;
+
+        let yaml = serde_yaml::to_string(&config)?;
+        let deserialized: OutputConfig = serde_yaml::from_str(&yaml)?;
+
+        assert!(deserialized.privacy.nofeed);
+        assert!(deserialized.privacy.robots_noindex);
+        assert!(!deserialized.privacy.noindex);
 
         Ok(())
     }
