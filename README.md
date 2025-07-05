@@ -365,7 +365,7 @@ Creates a single page bundle containing all photos from an album, ideal for phot
 
 #### Directory Structure
 
-```
+```text
 your-hugo-site/
 ├── config.yaml            # Your Hugo config
 ├── content/
