@@ -15,7 +15,7 @@ jobs:
       version_changed: ${{ steps.check-version.outputs.changed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
@@ -36,13 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build
         run: cargo build --release
