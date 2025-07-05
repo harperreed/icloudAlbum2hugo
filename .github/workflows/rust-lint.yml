@@ -32,4 +32,4 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Clippy check
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features --no-deps -- -D warnings
