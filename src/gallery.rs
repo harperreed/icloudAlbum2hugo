@@ -526,10 +526,10 @@ mod tests {
     fn create_test_photo(guid: &str) -> Photo {
         Photo {
             guid: guid.to_string(),
-            filename: format!("{}.jpg", guid),
-            caption: Some(format!("Caption for {}", guid)),
+            filename: format!("{guid}.jpg"),
+            caption: Some(format!("Caption for {guid}")),
             created_at: Utc::now(),
-            checksum: format!("checksum_{}", guid),
+            checksum: format!("checksum_{guid}"),
             url: format!("https://example.com/{guid}.jpg"),
             width: 800,
             height: 600,
