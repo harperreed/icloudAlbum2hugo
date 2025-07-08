@@ -530,7 +530,7 @@ mod tests {
             caption: Some(format!("Caption for {}", guid)),
             created_at: Utc::now(),
             checksum: format!("checksum_{}", guid),
-            url: format!("https://example.com/{}.jpg", guid),
+            url: format!("https://example.com/{guid}.jpg"),
             width: 800,
             height: 600,
             mime_type: "image/jpeg".to_string(),
