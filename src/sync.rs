@@ -959,11 +959,11 @@ mod tests {
     fn create_test_photo(guid: &str) -> Photo {
         Photo {
             guid: guid.to_string(),
-            filename: format!("{}.jpg", guid),
-            caption: Some(format!("Caption for {}", guid)),
+            filename: format!("{guid}.jpg"),
+            caption: Some(format!("Caption for {guid}")),
             created_at: Utc::now(),
-            checksum: format!("checksum_{}", guid),
-            url: format!("https://example.com/{}.jpg", guid),
+            checksum: format!("checksum_{guid}"),
+            url: format!("https://example.com/{guid}.jpg"),
             width: 800,
             height: 600,
             mime_type: "image/jpeg".to_string(),
@@ -974,11 +974,11 @@ mod tests {
     fn create_test_photo_no_caption(guid: &str) -> Photo {
         Photo {
             guid: guid.to_string(),
-            filename: format!("{}.jpg", guid),
+            filename: format!("{guid}.jpg"),
             caption: None,
             created_at: Utc::now(),
-            checksum: format!("checksum_{}", guid),
-            url: format!("https://example.com/{}.jpg", guid),
+            checksum: format!("checksum_{guid}"),
+            url: format!("https://example.com/{guid}.jpg"),
             width: 800,
             height: 600,
             mime_type: "image/jpeg".to_string(),
@@ -1040,7 +1040,7 @@ mod tests {
                 SyncResult::Unchanged(_) => unchanged_count += 1,
                 SyncResult::Deleted(_) => panic!("Should not have deleted any photos"),
                 SyncResult::Failed(guid, error) => {
-                    panic!("Photo {} failed to sync: {}", guid, error);
+                    panic!("Photo {guid} failed to sync: {error}");
                 }
             }
         }
@@ -1088,7 +1088,7 @@ mod tests {
                 photo.url.clone(),
                 photo.width,
                 photo.height,
-                PathBuf::from(format!("/content/{}/original.jpg", guid)),
+                PathBuf::from(format!("/content/{guid}/original.jpg")),
             );
 
             index.add_or_update_photo(indexed_photo);
@@ -1138,11 +1138,11 @@ mod tests {
                 photo.filename.clone(),
                 photo.caption.clone(),
                 photo.created_at,
-                format!("different_checksum_{}", guid), // Different checksum!
+                format!("different_checksum_{guid}"), // Different checksum!
                 photo.url.clone(),
                 photo.width,
                 photo.height,
-                PathBuf::from(format!("/content/{}/original.jpg", guid)),
+                PathBuf::from(format!("/content/{guid}/original.jpg")),
             );
 
             index.add_or_update_photo(indexed_photo);
