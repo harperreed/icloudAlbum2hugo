@@ -139,9 +139,6 @@ mod tests {
             country: Some("Test Country".to_string()),
         };
 
-        assert_eq!(
-            format!("{}", location),
-            "Test City, Test State, Test Country"
-        );
+        assert_eq!(format!("{location}"), "Test City, Test State, Test Country");
     }
 }
