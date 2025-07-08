@@ -89,7 +89,7 @@ impl GeocodingService for MockGeocodingService {
         let ew = if longitude >= 0.0 { "East" } else { "West" };
 
         Ok(Location {
-            formatted_address: format!("{} {} at {:.4}, {:.4}", ns, ew, latitude, longitude),
+            formatted_address: format!("{ns} {ew} at {latitude:.4}, {longitude:.4}"),
             city: None,
             state: None,
             country: None,
@@ -139,9 +139,6 @@ mod tests {
             country: Some("Test Country".to_string()),
         };
 
-        assert_eq!(
-            format!("{}", location),
-            "Test City, Test State, Test Country"
-        );
+        assert_eq!(format!("{location}"), "Test City, Test State, Test Country");
     }
 }

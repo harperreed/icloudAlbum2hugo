@@ -119,4 +119,3 @@ fn main() -> Result<(), Box<dyn Error>> {
 * Instead of `clap`, use [structopt](https://docs.rs/structopt) (older style but simpler for some).
 * Use a simple `.toml` or `.json` for config.
 * Shell out to `jhead` for metadata extraction instead of a Rust EXIF crate if you prefer.
-

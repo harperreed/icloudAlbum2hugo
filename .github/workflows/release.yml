@@ -15,16 +15,16 @@ jobs:
       version_changed: ${{ steps.check-version.outputs.changed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      
+
       - name: Get current version
         id: get-version
         run: |
           VERSION=$(grep -m 1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-      
+
       - name: Check if version changed
         id: check-version
         run: |
@@ -36,20 +36,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-      
+        uses: actions/checkout@v4
+
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Build
         run: cargo build --release
-      
+
       - name: Run tests
         run: cargo test
-      
+
       - name: Create tag
         run: |
           VERSION=${{ needs.check-version.outputs.version }}
@@ -57,7 +54,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git tag -a "v$VERSION" -m "Release v$VERSION"
           git push origin "v$VERSION"
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -68,7 +65,7 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Publish to crates.io
         uses: katyo/publish-crates@v2
         with:

@@ -17,7 +17,9 @@ use slugify::slugify;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::fs as tokio_fs;
+use uuid::Uuid;
 
+use crate::config::PrivacyConfig;
 use crate::exif::extract_exif;
 use crate::geocode::create_geocoding_service;
 use crate::icloud::{Album, Photo};
@@ -36,6 +38,8 @@ pub struct GallerySyncer {
     gallery_description: Option<String>,
     /// Path to the index file
     index_path: PathBuf,
+    /// Privacy configuration for Hugo frontmatter
+    privacy_config: PrivacyConfig,
 }
 
 impl GallerySyncer {
@@ -45,6 +49,7 @@ impl GallerySyncer {
         gallery_name: Option<String>,
         gallery_description: Option<String>,
         index_path: PathBuf,
+        privacy_config: PrivacyConfig,
     ) -> Self {
         Self {
             client: Client::new(),
@@ -52,6 +57,7 @@ impl GallerySyncer {
             gallery_name: gallery_name.unwrap_or_else(|| "Gallery".to_string()),
             gallery_description,
             index_path,
+            privacy_config,
         }
     }
 
@@ -113,7 +119,7 @@ impl GallerySyncer {
 
         // Check all photos in the album
         for (guid, photo) in &album.photos {
-            let photo_path = gallery_dir.join(format!("{}.jpg", guid));
+            let photo_path = gallery_dir.join(format!("{guid}.jpg"));
 
             // Check if the photo exists in our index
             if let Some(indexed_photo) = index.get_photo(guid) {
@@ -157,7 +163,7 @@ impl GallerySyncer {
                 Err(e) => {
                     results.push(SyncResult::Failed(
                         guid,
-                        format!("Failed to process photo: {}", e),
+                        format!("Failed to process photo: {e}"),
                     ));
                 }
             }
@@ -182,7 +188,7 @@ impl GallerySyncer {
                 Err(e) => {
                     results.push(SyncResult::Failed(
                         guid,
-                        format!("Failed to update photo: {}", e),
+                        format!("Failed to update photo: {e}"),
                     ));
                 }
             }
@@ -196,10 +202,10 @@ impl GallerySyncer {
             }
 
             // Try to remove the file
-            let photo_path = gallery_dir.join(format!("{}.jpg", guid));
+            let photo_path = gallery_dir.join(format!("{guid}.jpg"));
             if photo_path.exists() {
                 if let Err(e) = tokio_fs::remove_file(&photo_path).await {
-                    warn!("Failed to delete photo file {}: {}", guid, e);
+                    warn!("Failed to delete photo file {guid}: {e}");
                 }
             }
 
@@ -345,9 +351,31 @@ impl GallerySyncer {
             Utc::now().format("%Y-%m-%dT%H:%M:%S%z")
         );
 
+        // Add UUID
+        content.push_str(&format!("uuid: {}\n", gallery.uuid));
+
+        // Add slug - use UUID if privacy_config.uuid_slug is true
+        if self.privacy_config.uuid_slug {
+            content.push_str(&format!("slug: {}\n", gallery.uuid));
+        }
+
+        // Add privacy parameters
+        if self.privacy_config.nofeed {
+            content.push_str("nofeed: true\n");
+        }
+        if self.privacy_config.noindex {
+            content.push_str("noindex: true\n");
+        }
+        if self.privacy_config.unlisted {
+            content.push_str("unlisted: true\n");
+        }
+        if self.privacy_config.robots_noindex {
+            content.push_str("robots: noindex,nofollow\n");
+        }
+
         // Add description if available
         if let Some(ref description) = gallery.description {
-            content.push_str(&format!("description: \"{}\"\n", description));
+            content.push_str(&format!("description: \"{description}\"\n"));
         }
 
         // Add photo count
@@ -372,14 +400,14 @@ impl GallerySyncer {
             // Generate a formatted title with date, location, and camera info
             let formatted_title = format_photo_title(photo);
 
-            content.push_str(&format!("  - filename: {}\n", filename));
-            content.push_str(&format!("    caption: \"{}\"\n", formatted_title));
+            content.push_str(&format!("  - filename: {filename}\n"));
+            content.push_str(&format!("    caption: \"{formatted_title}\"\n"));
             content.push_str(&format!("    mime_type: \"{}\"\n", photo.mime_type));
 
             // Add original caption if available
             if let Some(ref caption) = photo.caption {
                 if !caption.trim().is_empty() {
-                    content.push_str(&format!("    original_caption: \"{}\"\n", caption));
+                    content.push_str(&format!("    original_caption: \"{caption}\"\n"));
                 }
             }
 
@@ -393,11 +421,11 @@ impl GallerySyncer {
 
             // Add camera if available
             if let Some(ref make) = photo.camera_make {
-                content.push_str(&format!("    camera_make: \"{}\"\n", make));
+                content.push_str(&format!("    camera_make: \"{make}\"\n"));
             }
 
             if let Some(ref model) = photo.camera_model {
-                content.push_str(&format!("    camera_model: \"{}\"\n", model));
+                content.push_str(&format!("    camera_model: \"{model}\"\n"));
             }
 
             // Add date
@@ -441,16 +469,12 @@ impl GallerySyncer {
             // For videos, use a video shortcode instead of figure
             if photo.mime_type == "video/mp4" {
                 content.push_str(&format!(
-                    "{{{{< video src=\"{}\" caption=\"{}\" >}}}}\n\n",
-                    filename, caption
+                    "{{{{< video src=\"{filename}\" caption=\"{caption}\" >}}}}\n\n"
                 ));
             } else {
                 // Build the figure shortcode for images
                 content.push_str(&format!(
-                    "{{{{< figure\n  src=\"{}\"\n  alt=\"{}\"\n  caption=\"{}\"\n  class=\"ma0 w-75\"\n>}}}}\n\n",
-                    filename,
-                    caption,
-                    caption
+                    "{{{{< figure\n  src=\"{filename}\"\n  alt=\"{caption}\"\n  caption=\"{caption}\"\n  class=\"ma0 w-75\"\n>}}}}\n\n"
                 ));
             }
         }
@@ -485,9 +509,8 @@ impl GallerySyncer {
             }
         }
 
-        // Generate a gallery ID from the album name and current time
-        let timestamp = Utc::now().timestamp();
-        let gallery_id = format!("gallery_{}", timestamp);
+        // Generate a gallery ID using UUID
+        let gallery_id = format!("gallery_{}", Uuid::new_v4());
 
         Ok(gallery_id)
     }
@@ -503,11 +526,11 @@ mod tests {
     fn create_test_photo(guid: &str) -> Photo {
         Photo {
             guid: guid.to_string(),
-            filename: format!("{}.jpg", guid),
-            caption: Some(format!("Caption for {}", guid)),
+            filename: format!("{guid}.jpg"),
+            caption: Some(format!("Caption for {guid}")),
             created_at: Utc::now(),
-            checksum: format!("checksum_{}", guid),
-            url: format!("https://example.com/{}.jpg", guid),
+            checksum: format!("checksum_{guid}"),
+            url: format!("https://example.com/{guid}.jpg"),
             width: 800,
             height: 600,
             mime_type: "image/jpeg".to_string(),
@@ -538,6 +561,7 @@ mod tests {
             Some("Test Gallery".to_string()),
             Some("Test gallery description".to_string()),
             index_path.clone(),
+            PrivacyConfig::default(),
         );
 
         // Start with an empty index
@@ -602,6 +626,101 @@ mod tests {
         // Check for date format in captions (just verify it contains a formatted month name)
         let display_date_pattern = chrono::Utc::now().format("%B").to_string();
         assert!(index_md.contains(&display_date_pattern));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_privacy_frontmatter_generation() -> Result<()> {
+        // Create a temporary directory for the test
+        let temp_dir = tempdir()?;
+        let content_dir = temp_dir.path().join("content");
+        let index_path = temp_dir.path().join("index.yaml");
+
+        // Create privacy config with all settings enabled
+        let privacy_config = PrivacyConfig {
+            nofeed: true,
+            noindex: true,
+            uuid_slug: true,
+            unlisted: true,
+            robots_noindex: true,
+        };
+
+        // Create the test gallery syncer with privacy settings
+        let gallery_syncer = GallerySyncer::new(
+            content_dir.clone(),
+            Some("Privacy Test Gallery".to_string()),
+            Some("Test gallery with privacy settings".to_string()),
+            index_path.clone(),
+            privacy_config,
+        );
+
+        // Start with an empty index
+        let mut index = PhotoIndex::new();
+
+        // Create a test album with one photo
+        let mut album = Album::new("Privacy Test Album".to_string());
+        let photo = create_test_photo("privacy_test");
+        album.photos.insert("privacy_test".to_string(), photo);
+
+        // Sync the gallery
+        let _results = gallery_syncer.sync_gallery(&album, &mut index).await?;
+
+        // Read the generated index.md file
+        let index_md_path = content_dir.join("index.md");
+        assert!(index_md_path.exists());
+
+        let content = fs::read_to_string(&index_md_path)?;
+
+        // Verify privacy parameters are in the frontmatter
+        assert!(content.contains("nofeed: true"));
+        assert!(content.contains("noindex: true"));
+        assert!(content.contains("unlisted: true"));
+        assert!(content.contains("robots: noindex,nofollow"));
+
+        // Verify UUID is present
+        assert!(content.contains("uuid: "));
+        assert!(content.contains("slug: "));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_uuid_id_generation() -> Result<()> {
+        // Create a temporary directory for the test
+        let temp_dir = tempdir()?;
+        let content_dir = temp_dir.path().join("content");
+        let index_path = temp_dir.path().join("index.yaml");
+
+        // Create the test gallery syncer
+        let gallery_syncer = GallerySyncer::new(
+            content_dir.clone(),
+            Some("UUID Test Gallery".to_string()),
+            Some("Test gallery with UUID ID".to_string()),
+            index_path.clone(),
+            PrivacyConfig::default(),
+        );
+
+        // Start with an empty index
+        let mut index = PhotoIndex::new();
+
+        // Create a test album
+        let album = create_test_album();
+
+        // Sync the gallery
+        let _results = gallery_syncer.sync_gallery(&album, &mut index).await?;
+
+        // Verify gallery was created with UUID-based ID
+        assert_eq!(index.gallery_count(), 1);
+        let gallery = index.galleries.values().next().unwrap();
+
+        // Gallery ID should start with "gallery_" and contain UUID
+        assert!(gallery.id.starts_with("gallery_"));
+        assert!(gallery.id.len() > 20); // UUID makes it longer than timestamp-based IDs
+
+        // UUID field should be separate and valid
+        assert!(!gallery.uuid.is_empty());
+        assert!(gallery.uuid.len() > 10);
 
         Ok(())
     }

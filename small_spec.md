@@ -103,4 +103,3 @@ Rust crates (tentative):
 ---
 
 Want me to scaffold out `main.rs` + command modules next? Or focus on one (like `sync`)?
-

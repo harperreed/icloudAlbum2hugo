@@ -164,7 +164,7 @@ fn extract_token(album_url: &str) -> Result<String> {
             // Validate and parse the URL
             let url = ICloudError::context(
                 Url::parse(album_url),
-                format!("Invalid iCloud shared album URL: {}", album_url),
+                format!("Invalid iCloud shared album URL: {album_url}"),
             )?;
 
             // Extract the token (shared album ID) from the URL fragment
@@ -193,7 +193,7 @@ fn extract_token(album_url: &str) -> Result<String> {
             // Extract the token from the path
             let url = ICloudError::context(
                 Url::parse(album_url),
-                format!("Invalid iCloud shared album invitation URL: {}", album_url),
+                format!("Invalid iCloud shared album invitation URL: {album_url}"),
             )?;
 
             // Use path_segments() which returns an iterator of segments
@@ -214,8 +214,7 @@ fn extract_token(album_url: &str) -> Result<String> {
             )))
         }
         ICloudUrlFormat::Unknown => Err(anyhow::anyhow!(ICloudError::InvalidUrl(format!(
-            "Unsupported iCloud URL format: {}",
-            album_url
+            "Unsupported iCloud URL format: {album_url}"
         )))),
     }
 }
@@ -277,12 +276,12 @@ impl ICloudError {
 impl fmt::Display for ICloudError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidUrl(msg) => write!(f, "Invalid iCloud URL: {}", msg),
-            Self::InvalidToken(msg) => write!(f, "Invalid iCloud token: {}", msg),
-            Self::FetchError(msg) => write!(f, "Failed to fetch album: {}", msg),
-            Self::PhotoProcessingError(msg) => write!(f, "Error processing photo: {}", msg),
-            Self::NoDerivativesError(msg) => write!(f, "No suitable derivatives: {}", msg),
-            Self::Context { context, source } => write!(f, "{}: {}", context, source),
+            Self::InvalidUrl(msg) => write!(f, "Invalid iCloud URL: {msg}"),
+            Self::InvalidToken(msg) => write!(f, "Invalid iCloud token: {msg}"),
+            Self::FetchError(msg) => write!(f, "Failed to fetch album: {msg}"),
+            Self::PhotoProcessingError(msg) => write!(f, "Error processing photo: {msg}"),
+            Self::NoDerivativesError(msg) => write!(f, "No suitable derivatives: {msg}"),
+            Self::Context { context, source } => write!(f, "{context}: {source}"),
         }
     }
 }
@@ -347,7 +346,7 @@ fn find_best_derivative(
         .iter()
         .find(|(key, derivative)| key.contains("original") && derivative.url.is_some())
     {
-        debug!("Found original derivative: {}", key);
+        debug!("Found original derivative: {key}");
         if let Some((url, width, height)) = extract_derivative_info(key, derivative) {
             let mime_type = determine_mime_type(&url, key);
             return Ok((url, width, height, mime_type));
@@ -406,7 +405,7 @@ fn find_best_derivative(
 
 /// Fetches photos from an iCloud shared album using the icloud-album-rs crate
 pub async fn fetch_album(album_url: &str) -> Result<Album> {
-    info!("Fetching iCloud shared album: {}", album_url);
+    info!("Fetching iCloud shared album: {album_url}");
 
     // Define test token indicators explicitly
     const TEST_TOKEN_INDICATORS: [&str; 3] = ["#test", "#custom", "#example"];
@@ -424,7 +423,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
     if !album_url.contains("icloud.com/sharedalbum")
         && !album_url.contains("share.icloud.com/photos")
     {
-        error!("Invalid iCloud URL: {}", album_url);
+        error!("Invalid iCloud URL: {album_url}");
         return Err(anyhow::anyhow!(ICloudError::InvalidUrl(
             "URL doesn't appear to be an iCloud shared album".to_string()
         )));
@@ -432,7 +431,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
 
     // Determine URL format
     let format = determine_url_format(album_url);
-    debug!("URL format determined: {:?}", format);
+    debug!("URL format determined: {format:?}");
 
     // Extract the token from the album URL
     debug!("Extracting token from URL");
@@ -445,7 +444,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
             token
         }
         Err(e) => {
-            error!("Failed to extract token: {}", e);
+            error!("Failed to extract token: {e}");
             return Err(anyhow::anyhow!(ICloudError::InvalidToken(e.to_string())));
         }
     };
@@ -458,7 +457,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
             data
         }
         Err(e) => {
-            error!("Failed to fetch iCloud album: {}", e);
+            error!("Failed to fetch iCloud album: {e}");
             return Err(anyhow::anyhow!(ICloudError::FetchError(e.to_string())));
         }
     };
@@ -467,7 +466,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
     // If stream_name is empty, use a generic name with the token as a fallback
     let album_name = if album_data.metadata.stream_name.trim().is_empty() {
         let name = format!("iCloud Album {}", token.chars().take(8).collect::<String>());
-        warn!("Album has no name, using generated name: {}", name);
+        warn!("Album has no name, using generated name: {name}");
         name
     } else {
         debug!("Using album name: {}", album_data.metadata.stream_name);
@@ -492,11 +491,11 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
         match result {
             Ok(()) => {
                 success_count += 1;
-                trace!("Successfully processed photo: {}", photo_guid);
+                trace!("Successfully processed photo: {photo_guid}");
             }
             Err(e) => {
                 error_count += 1;
-                warn!("Failed to process photo: {}", e);
+                warn!("Failed to process photo: {e}");
                 // Continue with the next photo instead of failing the entire operation
                 continue;
             }
@@ -512,10 +511,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
 
     // If we didn't find any photos, that's suspicious
     if album.photos.is_empty() && error_count > 0 {
-        error!(
-            "Failed to process any photos from the album despite finding {} photos",
-            error_count
-        );
+        error!("Failed to process any photos from the album despite finding {error_count} photos");
         return Err(anyhow::anyhow!(ICloudError::PhotoProcessingError(
             "Failed to process any photos from the album".to_string()
         )));
@@ -527,20 +523,20 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
 
 /// Parse a date string in RFC3339 format to a UTC DateTime
 fn parse_photo_date(date_str: &str) -> Result<DateTime<Utc>, ICloudError> {
-    debug!("Parsing date: {}", date_str);
+    debug!("Parsing date: {date_str}");
 
     DateTime::parse_from_rfc3339(date_str)
         .map(|dt| dt.with_timezone(&Utc))
         .map_err(|e| {
-            warn!("Failed to parse date '{}': {}", date_str, e);
-            ICloudError::PhotoProcessingError(format!("Failed to parse date {}: {}", date_str, e))
+            warn!("Failed to parse date '{date_str}': {e}");
+            ICloudError::PhotoProcessingError(format!("Failed to parse date {date_str}: {e}"))
         })
 }
 
 /// Generate a checksum for a photo based on its GUID and URL
 fn generate_photo_checksum(guid: &str, url: &str) -> String {
-    let checksum = format!("{:x}", md5::compute(format!("{}:{}", guid, url)));
-    trace!("Generated checksum: {}", checksum);
+    let checksum = format!("{:x}", md5::compute(format!("{guid}:{url}")));
+    trace!("Generated checksum: {checksum}");
     checksum
 }
 
@@ -582,17 +578,14 @@ fn process_photo(
 
     // Find the best derivative with URL, width, height, and MIME type
     let (url, width, height, mime_type) = find_best_derivative(&photo)?;
-    debug!(
-        "Found best derivative: width={}, height={}, mime_type={}",
-        width, height, mime_type
-    );
+    debug!("Found best derivative: width={width}, height={height}, mime_type={mime_type}");
 
     // Parse the created date or use current time as fallback
     let created_at = match &photo.date_created {
         Some(date_str) => parse_photo_date(date_str)?,
         None => {
             let now = Utc::now();
-            debug!("No date found, using current time: {}", now);
+            debug!("No date found, using current time: {now}");
             now
         }
     };
@@ -614,7 +607,7 @@ fn process_photo(
 
     let icloud_photo = Photo {
         guid: photo.photo_guid,
-        filename: format!("{}.{}", guid, extension),
+        filename: format!("{guid}.{extension}"),
         caption: photo.caption.clone(),
         created_at,
         checksum,

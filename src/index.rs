@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use uuid::Uuid;
 
 use crate::geocode::Location;
 
@@ -88,6 +89,8 @@ pub struct IndexedPhoto {
 pub struct Gallery {
     /// Unique identifier for the gallery
     pub id: String,
+    /// UUID for the gallery (used for privacy and unique identification)
+    pub uuid: String,
     /// Display name for the gallery
     pub name: String,
     /// URL-friendly name for the gallery directory
@@ -107,6 +110,7 @@ impl Gallery {
     pub fn new(id: String, name: String, slug: String, description: Option<String>) -> Self {
         Self {
             id,
+            uuid: Uuid::new_v4().to_string(),
             name,
             slug,
             description,
@@ -468,6 +472,51 @@ mod tests {
 
         // Verify it's a new empty index
         assert_eq!(index.photo_count(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_gallery_uuid_generation() {
+        let gallery = Gallery::new(
+            "test_id".to_string(),
+            "Test Gallery".to_string(),
+            "test-gallery".to_string(),
+            Some("Test Description".to_string()),
+        );
+
+        // UUID should be valid and non-empty
+        assert!(!gallery.uuid.is_empty());
+        assert!(gallery.uuid.len() > 10); // UUIDs are typically 36 characters with hyphens
+
+        // Create another gallery and verify UUIDs are different
+        let gallery2 = Gallery::new(
+            "test_id_2".to_string(),
+            "Test Gallery 2".to_string(),
+            "test-gallery-2".to_string(),
+            None,
+        );
+
+        assert_ne!(gallery.uuid, gallery2.uuid);
+    }
+
+    #[test]
+    fn test_gallery_serialization_with_uuid() -> Result<()> {
+        let gallery = Gallery::new(
+            "test_id".to_string(),
+            "Test Gallery".to_string(),
+            "test-gallery".to_string(),
+            Some("Test Description".to_string()),
+        );
+
+        let yaml = serde_yaml::to_string(&gallery)?;
+        let deserialized: Gallery = serde_yaml::from_str(&yaml)?;
+
+        assert_eq!(gallery.id, deserialized.id);
+        assert_eq!(gallery.uuid, deserialized.uuid);
+        assert_eq!(gallery.name, deserialized.name);
+        assert_eq!(gallery.slug, deserialized.slug);
+        assert_eq!(gallery.description, deserialized.description);
 
         Ok(())
     }
