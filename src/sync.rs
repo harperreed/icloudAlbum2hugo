@@ -166,11 +166,11 @@ mime_type: {}
 
         // Add EXIF data if available
         if let Some(ref make) = photo.camera_make {
-            frontmatter.push_str(&format!("camera_make: {}\n", make));
+            frontmatter.push_str(&format!("camera_make: {make}\n"));
         }
 
         if let Some(ref model) = photo.camera_model {
-            frontmatter.push_str(&format!("camera_model: {}\n", model));
+            frontmatter.push_str(&format!("camera_model: {model}\n"));
         }
 
         if let Some(exif_dt) = photo.exif_date_time {
@@ -182,36 +182,36 @@ mime_type: {}
 
         // Add GPS data (original and fuzzed)
         if let Some(lat) = photo.latitude {
-            frontmatter.push_str(&format!("original_latitude: {:.6}\n", lat));
+            frontmatter.push_str(&format!("original_latitude: {lat:.6}\n"));
         }
 
         if let Some(lon) = photo.longitude {
-            frontmatter.push_str(&format!("original_longitude: {:.6}\n", lon));
+            frontmatter.push_str(&format!("original_longitude: {lon:.6}\n"));
         }
 
         if let Some(lat) = photo.fuzzed_latitude {
-            frontmatter.push_str(&format!("latitude: {:.6}\n", lat));
+            frontmatter.push_str(&format!("latitude: {lat:.6}\n"));
         }
 
         if let Some(lon) = photo.fuzzed_longitude {
-            frontmatter.push_str(&format!("longitude: {:.6}\n", lon));
+            frontmatter.push_str(&format!("longitude: {lon:.6}\n"));
         }
 
         // Add camera settings if available
         if let Some(iso) = photo.iso {
-            frontmatter.push_str(&format!("iso: {}\n", iso));
+            frontmatter.push_str(&format!("iso: {iso}\n"));
         }
 
         if let Some(ref exposure) = photo.exposure_time {
-            frontmatter.push_str(&format!("exposure_time: {}\n", exposure));
+            frontmatter.push_str(&format!("exposure_time: {exposure}\n"));
         }
 
         if let Some(aperture) = photo.f_number {
-            frontmatter.push_str(&format!("f_number: {:.1}\n", aperture));
+            frontmatter.push_str(&format!("f_number: {aperture:.1}\n"));
         }
 
         if let Some(focal) = photo.focal_length {
-            frontmatter.push_str(&format!("focal_length: {:.1}\n", focal));
+            frontmatter.push_str(&format!("focal_length: {focal:.1}\n"));
         }
 
         // Add location data if available
@@ -219,15 +219,15 @@ mime_type: {}
             frontmatter.push_str(&format!("location: {}\n", location.formatted_address));
 
             if let Some(ref city) = location.city {
-                frontmatter.push_str(&format!("city: {}\n", city));
+                frontmatter.push_str(&format!("city: {city}\n"));
             }
 
             if let Some(ref state) = location.state {
-                frontmatter.push_str(&format!("state: {}\n", state));
+                frontmatter.push_str(&format!("state: {state}\n"));
             }
 
             if let Some(ref country) = location.country {
-                frontmatter.push_str(&format!("country: {}\n", country));
+                frontmatter.push_str(&format!("country: {country}\n"));
             }
         }
 
@@ -328,7 +328,7 @@ impl Syncer {
                 let sync_result = match result {
                     Ok(_) => SyncResult::Deleted(guid.clone()),
                     Err(e) => {
-                        SyncResult::Failed(guid.clone(), format!("Failed to delete photo: {}", e))
+                        SyncResult::Failed(guid.clone(), format!("Failed to delete photo: {e}"))
                     }
                 };
 
@@ -378,7 +378,7 @@ impl Syncer {
             debug!("Deleting directory for photo {guid}");
             tokio_fs::remove_dir_all(&photo_dir)
                 .await
-                .with_context(|| format!("Failed to delete directory for photo {}", guid))?;
+                .with_context(|| format!("Failed to delete directory for photo {guid}"))?;
         }
 
         Ok(())
@@ -440,7 +440,7 @@ impl Syncer {
                         results_guard.push((Ok(indexed_photo), status));
                     }
                     Err(e) => {
-                        let error = format!("Failed to sync photo: {}", e);
+                        let error = format!("Failed to sync photo: {e}");
                         results_guard.push((Err(error), guid));
                     }
                 }
@@ -702,7 +702,7 @@ impl Syncer {
         if tokio_fs::try_exists(&photo_dir).await.unwrap_or(false) {
             tokio_fs::remove_dir_all(&photo_dir)
                 .await
-                .with_context(|| format!("Failed to delete directory for photo {}", guid))?;
+                .with_context(|| format!("Failed to delete directory for photo {guid}"))?;
         }
 
         // Remove the photo from the index
@@ -873,11 +873,11 @@ mime_type: {}
 
         // Add EXIF data if available
         if let Some(ref make) = photo.camera_make {
-            frontmatter.push_str(&format!("camera_make: {}\n", make));
+            frontmatter.push_str(&format!("camera_make: {make}\n"));
         }
 
         if let Some(ref model) = photo.camera_model {
-            frontmatter.push_str(&format!("camera_model: {}\n", model));
+            frontmatter.push_str(&format!("camera_model: {model}\n"));
         }
 
         if let Some(exif_dt) = photo.exif_date_time {
@@ -889,36 +889,36 @@ mime_type: {}
 
         // Add GPS data (original and fuzzed)
         if let Some(lat) = photo.latitude {
-            frontmatter.push_str(&format!("original_latitude: {:.6}\n", lat));
+            frontmatter.push_str(&format!("original_latitude: {lat:.6}\n"));
         }
 
         if let Some(lon) = photo.longitude {
-            frontmatter.push_str(&format!("original_longitude: {:.6}\n", lon));
+            frontmatter.push_str(&format!("original_longitude: {lon:.6}\n"));
         }
 
         if let Some(lat) = photo.fuzzed_latitude {
-            frontmatter.push_str(&format!("latitude: {:.6}\n", lat));
+            frontmatter.push_str(&format!("latitude: {lat:.6}\n"));
         }
 
         if let Some(lon) = photo.fuzzed_longitude {
-            frontmatter.push_str(&format!("longitude: {:.6}\n", lon));
+            frontmatter.push_str(&format!("longitude: {lon:.6}\n"));
         }
 
         // Add camera settings if available
         if let Some(iso) = photo.iso {
-            frontmatter.push_str(&format!("iso: {}\n", iso));
+            frontmatter.push_str(&format!("iso: {iso}\n"));
         }
 
         if let Some(ref exposure) = photo.exposure_time {
-            frontmatter.push_str(&format!("exposure_time: {}\n", exposure));
+            frontmatter.push_str(&format!("exposure_time: {exposure}\n"));
         }
 
         if let Some(aperture) = photo.f_number {
-            frontmatter.push_str(&format!("f_number: {:.1}\n", aperture));
+            frontmatter.push_str(&format!("f_number: {aperture:.1}\n"));
         }
 
         if let Some(focal) = photo.focal_length {
-            frontmatter.push_str(&format!("focal_length: {:.1}\n", focal));
+            frontmatter.push_str(&format!("focal_length: {focal:.1}\n"));
         }
 
         // Add location data if available
@@ -926,15 +926,15 @@ mime_type: {}
             frontmatter.push_str(&format!("location: {}\n", location.formatted_address));
 
             if let Some(ref city) = location.city {
-                frontmatter.push_str(&format!("city: {}\n", city));
+                frontmatter.push_str(&format!("city: {city}\n"));
             }
 
             if let Some(ref state) = location.state {
-                frontmatter.push_str(&format!("state: {}\n", state));
+                frontmatter.push_str(&format!("state: {state}\n"));
             }
 
             if let Some(ref country) = location.country {
-                frontmatter.push_str(&format!("country: {}\n", country));
+                frontmatter.push_str(&format!("country: {country}\n"));
             }
         }
 

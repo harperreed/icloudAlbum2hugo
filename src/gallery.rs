@@ -119,7 +119,7 @@ impl GallerySyncer {
 
         // Check all photos in the album
         for (guid, photo) in &album.photos {
-            let photo_path = gallery_dir.join(format!("{}.jpg", guid));
+            let photo_path = gallery_dir.join(format!("{guid}.jpg"));
 
             // Check if the photo exists in our index
             if let Some(indexed_photo) = index.get_photo(guid) {
@@ -163,7 +163,7 @@ impl GallerySyncer {
                 Err(e) => {
                     results.push(SyncResult::Failed(
                         guid,
-                        format!("Failed to process photo: {}", e),
+                        format!("Failed to process photo: {e}"),
                     ));
                 }
             }
@@ -188,7 +188,7 @@ impl GallerySyncer {
                 Err(e) => {
                     results.push(SyncResult::Failed(
                         guid,
-                        format!("Failed to update photo: {}", e),
+                        format!("Failed to update photo: {e}"),
                     ));
                 }
             }
@@ -202,7 +202,7 @@ impl GallerySyncer {
             }
 
             // Try to remove the file
-            let photo_path = gallery_dir.join(format!("{}.jpg", guid));
+            let photo_path = gallery_dir.join(format!("{guid}.jpg"));
             if photo_path.exists() {
                 if let Err(e) = tokio_fs::remove_file(&photo_path).await {
                     warn!("Failed to delete photo file {guid}: {e}");
@@ -400,7 +400,7 @@ impl GallerySyncer {
             // Generate a formatted title with date, location, and camera info
             let formatted_title = format_photo_title(photo);
 
-            content.push_str(&format!("  - filename: {}\n", filename));
+            content.push_str(&format!("  - filename: {filename}\n"));
             content.push_str(&format!("    caption: \"{formatted_title}\"\n"));
             content.push_str(&format!("    mime_type: \"{}\"\n", photo.mime_type));
 

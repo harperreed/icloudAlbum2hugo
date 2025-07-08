@@ -89,7 +89,7 @@ impl GeocodingService for MockGeocodingService {
         let ew = if longitude >= 0.0 { "East" } else { "West" };
 
         Ok(Location {
-            formatted_address: format!("{ns} {ew} at {:.4}, {:.4}", latitude, longitude),
+            formatted_address: format!("{ns} {ew} at {latitude:.4}, {longitude:.4}"),
             city: None,
             state: None,
             country: None,

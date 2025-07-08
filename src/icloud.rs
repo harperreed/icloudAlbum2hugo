@@ -164,7 +164,7 @@ fn extract_token(album_url: &str) -> Result<String> {
             // Validate and parse the URL
             let url = ICloudError::context(
                 Url::parse(album_url),
-                format!("Invalid iCloud shared album URL: {}", album_url),
+                format!("Invalid iCloud shared album URL: {album_url}"),
             )?;
 
             // Extract the token (shared album ID) from the URL fragment
@@ -193,7 +193,7 @@ fn extract_token(album_url: &str) -> Result<String> {
             // Extract the token from the path
             let url = ICloudError::context(
                 Url::parse(album_url),
-                format!("Invalid iCloud shared album invitation URL: {}", album_url),
+                format!("Invalid iCloud shared album invitation URL: {album_url}"),
             )?;
 
             // Use path_segments() which returns an iterator of segments
@@ -529,13 +529,13 @@ fn parse_photo_date(date_str: &str) -> Result<DateTime<Utc>, ICloudError> {
         .map(|dt| dt.with_timezone(&Utc))
         .map_err(|e| {
             warn!("Failed to parse date '{date_str}': {e}");
-            ICloudError::PhotoProcessingError(format!("Failed to parse date {}: {e}", date_str))
+            ICloudError::PhotoProcessingError(format!("Failed to parse date {date_str}: {e}"))
         })
 }
 
 /// Generate a checksum for a photo based on its GUID and URL
 fn generate_photo_checksum(guid: &str, url: &str) -> String {
-    let checksum = format!("{:x}", md5::compute(format!("{}:{url}", guid)));
+    let checksum = format!("{:x}", md5::compute(format!("{guid}:{url}")));
     trace!("Generated checksum: {checksum}");
     checksum
 }
@@ -607,7 +607,7 @@ fn process_photo(
 
     let icloud_photo = Photo {
         guid: photo.photo_guid,
-        filename: format!("{}.{extension}", guid),
+        filename: format!("{guid}.{extension}"),
         caption: photo.caption.clone(),
         created_at,
         checksum,
