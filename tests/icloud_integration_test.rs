@@ -34,7 +34,7 @@ fn get_test_token() -> String {
 
 /// Create a test URL from a token
 fn create_test_url(token: &str) -> String {
-    format!("https://www.icloud.com/sharedalbum/#{}", token)
+    format!("https://www.icloud.com/sharedalbum/#{token}")
 }
 
 #[tokio::test]
