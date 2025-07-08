@@ -59,7 +59,7 @@ async fn test_real_icloud_fetch() {
 
     // Create the URL
     let url = create_test_url(&token);
-    info!("Testing with URL: {}", url);
+    info!("Testing with URL: {url}");
 
     // Fetch the album
     let result = icloud::fetch_album(&url).await;
@@ -94,7 +94,7 @@ async fn test_real_icloud_fetch() {
             }
         }
         Err(err) => {
-            panic!("❌ Failed to fetch iCloud album: {}", err);
+            panic!("❌ Failed to fetch iCloud album: {err}");
         }
     }
 }
@@ -128,17 +128,14 @@ async fn test_invalid_urls() {
 
         match result {
             Ok(_) => {
-                panic!(
-                    "❌ Expected error for invalid URL '{}', but got success",
-                    url
-                );
+                panic!("❌ Expected error for invalid URL '{url}', but got success");
             }
             Err(err) => {
-                info!("✅ Correctly handled invalid URL: {}", err);
+                info!("✅ Correctly handled invalid URL: {err}");
                 passed += 1;
             }
         }
     }
 
-    info!("✅ All {} invalid URL tests passed", passed);
+    info!("✅ All {passed} invalid URL tests passed");
 }
