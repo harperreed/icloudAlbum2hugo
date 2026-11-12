@@ -393,16 +393,16 @@ async fn main() -> Result<()> {
                     );
 
                     // Show gallery info if this is a gallery output
-                    if let OutputType::Gallery = output_config.output_type {
-                        if photo_index.gallery_count() > 0 {
-                            println!("\n🖼️  Gallery Information:");
-                            for gallery in photo_index.galleries.values() {
-                                println!(
-                                    "  • Gallery '{}' contains {} photos",
-                                    gallery.name,
-                                    gallery.photos.len()
-                                );
-                            }
+                    if let OutputType::Gallery = output_config.output_type
+                        && photo_index.gallery_count() > 0
+                    {
+                        println!("\n🖼️  Gallery Information:");
+                        for gallery in photo_index.galleries.values() {
+                            println!(
+                                "  • Gallery '{}' contains {} photos",
+                                gallery.name,
+                                gallery.photos.len()
+                            );
                         }
                     }
                 }
@@ -573,12 +573,13 @@ fn init_config(config_path_opt: &Option<PathBuf>, force: bool) -> Result<()> {
     }
 
     // Ensure parent directory exists
-    if let Some(parent) = config_path.parent() {
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            debug!("Creating parent directory: {}", parent.display());
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create directory {}", parent.display()))?;
-        }
+    if let Some(parent) = config_path.parent()
+        && !parent.as_os_str().is_empty()
+        && !parent.exists()
+    {
+        debug!("Creating parent directory: {}", parent.display());
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory {}", parent.display()))?;
     }
 
     // Create a default config with example outputs

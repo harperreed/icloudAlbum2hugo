@@ -30,17 +30,12 @@ pub(crate) mod test_constants {
     pub const TEST_MOCK_DIRECTORY: &str = "custom/tests";
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputType {
+    #[default]
     Photostream,
     Gallery,
-}
-
-impl Default for OutputType {
-    fn default() -> Self {
-        Self::Photostream
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -125,10 +120,10 @@ impl Default for Config {
 impl Config {
     pub fn save_to_file(&self, path: &Path) -> Result<()> {
         // Ensure parent directory exists
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)?;
-            }
+        if let Some(parent) = path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent)?;
         }
 
         let yaml = serde_yaml::to_string(self)?;

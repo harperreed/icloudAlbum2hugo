@@ -28,14 +28,8 @@ pub async fn debug_album_api(album_url: &str) -> Result<()> {
     // Extract the token (shared album ID) from the URL
     let token = url
         .fragment()
-        .and_then(|fragment| {
-            // Typical format is "fragment=#B0aBcDeFG..." - we want the part after #
-            if fragment.starts_with("B") {
-                Some(fragment)
-            } else {
-                None
-            }
-        })
+        // Typical format is "fragment=#B0aBcDeFG..." - we want the part after #
+        .filter(|fragment| fragment.starts_with('B'))
         .ok_or_else(|| {
             anyhow::anyhow!("Invalid iCloud shared album URL: missing or invalid token")
         })?;

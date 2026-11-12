@@ -1,18 +1,17 @@
 //! Integration tests for real iCloud API
 //!
-//! These tests are optional and only run when the ICLOUD_TEST_TOKEN environment
-//! variable is set. They test the real iCloud API integration using the provided token.
+//! Tests that talk to the live iCloud API are optional and only run when the
+//! `ICLOUD_TEST_TOKEN` environment variable is set. Without it they skip, so a
+//! plain `cargo test` does not depend on network access or on the validity of a
+//! hard-coded share token.
 //!
 //! Run with:
-//! ICLOUD_TEST_TOKEN=B2T5VaUrzMLxwU cargo test --test icloud_integration_test -- --nocapture
+//! ICLOUD_TEST_TOKEN=<shared-album-token> cargo test --test icloud_integration_test -- --nocapture
 
 use icloudAlbum2hugo::icloud;
 use log::{info, warn};
 use std::env;
 use std::sync::Once;
-
-/// Token for testing - can be overridden with ICLOUD_TEST_TOKEN environment variable
-const DEFAULT_TEST_TOKEN: &str = "B2T5VaUrzMLxwU";
 
 // Initialize the logger only once
 static INIT: Once = Once::new();
@@ -27,9 +26,16 @@ fn init_logger() {
     });
 }
 
-/// Get the iCloud token from environment or use default
-fn get_test_token() -> String {
-    env::var("ICLOUD_TEST_TOKEN").unwrap_or_else(|_| DEFAULT_TEST_TOKEN.to_string())
+/// Get the iCloud token from the environment, if one was provided
+fn get_test_token() -> Option<String> {
+    env::var("ICLOUD_TEST_TOKEN")
+        .ok()
+        .filter(|token| !token.trim().is_empty())
+}
+
+/// Whether tests that require live network access to iCloud should be skipped
+fn skip_network_tests() -> bool {
+    env::var("CI").is_ok() || env::var("SKIP_ICLOUD_TEST").is_ok()
 }
 
 /// Create a test URL from a token
@@ -42,20 +48,19 @@ async fn test_real_icloud_fetch() {
     // Initialize the logger
     init_logger();
 
-    // Get the test token
-    let token = get_test_token();
-
     // Skip test if running in CI or explicitly disabled
-    if env::var("CI").is_ok() || env::var("SKIP_ICLOUD_TEST").is_ok() {
+    if skip_network_tests() {
         info!("Skipping iCloud integration test in CI environment");
         return;
     }
 
-    if token == DEFAULT_TEST_TOKEN {
-        info!("Using default test token - override with ICLOUD_TEST_TOKEN env var if needed");
-    } else {
-        info!("Using custom test token from environment");
-    }
+    // This test needs a real share token; without one there is nothing to fetch.
+    let Some(token) = get_test_token() else {
+        info!("Skipping iCloud integration test: set ICLOUD_TEST_TOKEN to run it");
+        return;
+    };
+
+    info!("Using test token from environment");
 
     // Create the URL
     let url = create_test_url(&token);
@@ -106,7 +111,7 @@ async fn test_invalid_urls() {
     init_logger();
 
     // Skip test if running in CI or explicitly disabled
-    if env::var("CI").is_ok() || env::var("SKIP_ICLOUD_TEST").is_ok() {
+    if skip_network_tests() {
         info!("Skipping iCloud integration test in CI environment");
         return;
     }

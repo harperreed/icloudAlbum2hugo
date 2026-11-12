@@ -258,12 +258,11 @@ impl PhotoIndex {
     /// Save the photo index to the specified path
     pub fn save(&self, path: &Path) -> Result<()> {
         // Ensure parent directory exists
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).with_context(|| {
-                    format!("Failed to create directory for {}", path.display())
-                })?;
-            }
+        if let Some(parent) = path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create directory for {}", path.display()))?;
         }
 
         // Serialize and write to file
