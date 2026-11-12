@@ -177,10 +177,10 @@ impl GallerySyncer {
                     index.add_or_update_photo(indexed_photo);
 
                     // Add to gallery if not already there
-                    if let Some(gallery) = index.galleries.get_mut(&gallery_id) {
-                        if !gallery.photos.contains(&guid) {
-                            gallery.add_photo(guid.clone());
-                        }
+                    if let Some(gallery) = index.galleries.get_mut(&gallery_id)
+                        && !gallery.photos.contains(&guid)
+                    {
+                        gallery.add_photo(guid.clone());
                     }
 
                     results.push(SyncResult::Updated(guid));
@@ -203,10 +203,10 @@ impl GallerySyncer {
 
             // Try to remove the file
             let photo_path = gallery_dir.join(format!("{guid}.jpg"));
-            if photo_path.exists() {
-                if let Err(e) = tokio_fs::remove_file(&photo_path).await {
-                    warn!("Failed to delete photo file {guid}: {e}");
-                }
+            if photo_path.exists()
+                && let Err(e) = tokio_fs::remove_file(&photo_path).await
+            {
+                warn!("Failed to delete photo file {guid}: {e}");
             }
 
             results.push(SyncResult::Deleted(guid));
@@ -405,10 +405,10 @@ impl GallerySyncer {
             content.push_str(&format!("    mime_type: \"{}\"\n", photo.mime_type));
 
             // Add original caption if available
-            if let Some(ref caption) = photo.caption {
-                if !caption.trim().is_empty() {
-                    content.push_str(&format!("    original_caption: \"{caption}\"\n"));
-                }
+            if let Some(ref caption) = photo.caption
+                && !caption.trim().is_empty()
+            {
+                content.push_str(&format!("    original_caption: \"{caption}\"\n"));
             }
 
             // Add location if available

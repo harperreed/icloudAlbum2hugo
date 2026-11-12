@@ -97,12 +97,11 @@ pub fn extract_exif(image_path: &Path) -> Result<ExifMetadata> {
 
 /// Helper function to extract a string from EXIF data
 fn get_exif_string(exif: &Exif, tag: Tag) -> Option<String> {
-    if let Some(field) = exif.get_field(tag, In::PRIMARY) {
-        if let Value::Ascii(ref vec) = field.value {
-            if let Some(string) = vec.first() {
-                return Some(String::from_utf8_lossy(string).to_string());
-            }
-        }
+    if let Some(field) = exif.get_field(tag, In::PRIMARY)
+        && let Value::Ascii(ref vec) = field.value
+        && let Some(string) = vec.first()
+    {
+        return Some(String::from_utf8_lossy(string).to_string());
     }
     None
 }
@@ -122,35 +121,33 @@ fn get_exif_u32(exif: &Exif, tag: Tag) -> Option<u32> {
 
 /// Helper function to extract a f32 value from EXIF data
 fn get_exif_f32(exif: &Exif, tag: Tag) -> Option<f32> {
-    if let Some(field) = exif.get_field(tag, In::PRIMARY) {
-        if let Value::Rational(ref vec) = field.value {
-            if let Some(rational) = vec.first() {
-                return Some(rational.to_f32());
-            }
-        }
+    if let Some(field) = exif.get_field(tag, In::PRIMARY)
+        && let Value::Rational(ref vec) = field.value
+        && let Some(rational) = vec.first()
+    {
+        return Some(rational.to_f32());
     }
     None
 }
 
 /// Helper function to extract a rational value and format it as a string
 fn get_exif_rational_as_string(exif: &Exif, tag: Tag) -> Option<String> {
-    if let Some(field) = exif.get_field(tag, In::PRIMARY) {
-        if let Value::Rational(ref vec) = field.value {
-            if let Some(rational) = vec.first() {
-                if rational.denom == 1 {
-                    // When denominator is 1, just show the numerator (e.g., "30" seconds)
-                    return Some(format!("{}", rational.num));
-                } else if rational.num == 0 {
-                    // Handle the case where numerator is 0
-                    return Some("0".to_string());
-                } else if rational.denom % rational.num == 0 {
-                    // When denominator is a multiple of numerator (e.g., 1/60, 1/125)
-                    return Some(format!("1/{}", rational.denom / rational.num));
-                } else {
-                    // General case: display as num/denom fraction
-                    return Some(format!("{}/{}", rational.num, rational.denom));
-                }
-            }
+    if let Some(field) = exif.get_field(tag, In::PRIMARY)
+        && let Value::Rational(ref vec) = field.value
+        && let Some(rational) = vec.first()
+    {
+        if rational.denom == 1 {
+            // When denominator is 1, just show the numerator (e.g., "30" seconds)
+            return Some(format!("{}", rational.num));
+        } else if rational.num == 0 {
+            // Handle the case where numerator is 0
+            return Some("0".to_string());
+        } else if rational.denom % rational.num == 0 {
+            // When denominator is a multiple of numerator (e.g., 1/60, 1/125)
+            return Some(format!("1/{}", rational.denom / rational.num));
+        } else {
+            // General case: display as num/denom fraction
+            return Some(format!("{}/{}", rational.num, rational.denom));
         }
     }
     None
@@ -211,22 +208,20 @@ fn extract_gps_coordinates(exif: &Exif, metadata: &mut ExifMetadata) {
     let mut lat_sec = 0.0;
     let mut lat_dir = String::new();
 
-    if let Some(field) = exif.get_field(Tag::GPSLatitude, In::PRIMARY) {
-        if let Value::Rational(ref vec) = field.value {
-            if vec.len() >= 3 {
-                lat_deg = vec[0].to_f64();
-                lat_min = vec[1].to_f64();
-                lat_sec = vec[2].to_f64();
-            }
-        }
+    if let Some(field) = exif.get_field(Tag::GPSLatitude, In::PRIMARY)
+        && let Value::Rational(ref vec) = field.value
+        && vec.len() >= 3
+    {
+        lat_deg = vec[0].to_f64();
+        lat_min = vec[1].to_f64();
+        lat_sec = vec[2].to_f64();
     }
 
-    if let Some(field) = exif.get_field(Tag::GPSLatitudeRef, In::PRIMARY) {
-        if let Value::Ascii(ref vec) = field.value {
-            if let Some(dir) = vec.first() {
-                lat_dir = String::from_utf8_lossy(dir).to_string();
-            }
-        }
+    if let Some(field) = exif.get_field(Tag::GPSLatitudeRef, In::PRIMARY)
+        && let Value::Ascii(ref vec) = field.value
+        && let Some(dir) = vec.first()
+    {
+        lat_dir = String::from_utf8_lossy(dir).to_string();
     }
 
     // Extract longitude
@@ -235,22 +230,20 @@ fn extract_gps_coordinates(exif: &Exif, metadata: &mut ExifMetadata) {
     let mut lon_sec = 0.0;
     let mut lon_dir = String::new();
 
-    if let Some(field) = exif.get_field(Tag::GPSLongitude, In::PRIMARY) {
-        if let Value::Rational(ref vec) = field.value {
-            if vec.len() >= 3 {
-                lon_deg = vec[0].to_f64();
-                lon_min = vec[1].to_f64();
-                lon_sec = vec[2].to_f64();
-            }
-        }
+    if let Some(field) = exif.get_field(Tag::GPSLongitude, In::PRIMARY)
+        && let Value::Rational(ref vec) = field.value
+        && vec.len() >= 3
+    {
+        lon_deg = vec[0].to_f64();
+        lon_min = vec[1].to_f64();
+        lon_sec = vec[2].to_f64();
     }
 
-    if let Some(field) = exif.get_field(Tag::GPSLongitudeRef, In::PRIMARY) {
-        if let Value::Ascii(ref vec) = field.value {
-            if let Some(dir) = vec.first() {
-                lon_dir = String::from_utf8_lossy(dir).to_string();
-            }
-        }
+    if let Some(field) = exif.get_field(Tag::GPSLongitudeRef, In::PRIMARY)
+        && let Value::Ascii(ref vec) = field.value
+        && let Some(dir) = vec.first()
+    {
+        lon_dir = String::from_utf8_lossy(dir).to_string();
     }
 
     // Convert to decimal degrees
@@ -337,18 +330,18 @@ mod tests {
         assert!(metadata.fuzzed_longitude.is_some());
 
         // Check that the fuzzed value is within expected range
-        if let Some(orig_lat) = metadata.latitude {
-            if let Some(fuzz_lat) = metadata.fuzzed_latitude {
-                assert!((orig_lat - fuzz_lat).abs() <= 0.001);
-                assert!((orig_lat - fuzz_lat).abs() > 0.0);
-            }
+        if let Some(orig_lat) = metadata.latitude
+            && let Some(fuzz_lat) = metadata.fuzzed_latitude
+        {
+            assert!((orig_lat - fuzz_lat).abs() <= 0.001);
+            assert!((orig_lat - fuzz_lat).abs() > 0.0);
         }
 
-        if let Some(orig_lon) = metadata.longitude {
-            if let Some(fuzz_lon) = metadata.fuzzed_longitude {
-                assert!((orig_lon - fuzz_lon).abs() <= 0.001);
-                assert!((orig_lon - fuzz_lon).abs() > 0.0);
-            }
+        if let Some(orig_lon) = metadata.longitude
+            && let Some(fuzz_lon) = metadata.fuzzed_longitude
+        {
+            assert!((orig_lon - fuzz_lon).abs() <= 0.001);
+            assert!((orig_lon - fuzz_lon).abs() > 0.0);
         }
     }
 

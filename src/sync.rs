@@ -404,12 +404,12 @@ impl Syncer {
 
         for (guid, photo) in &album.photos {
             // Check if the photo exists and has the same checksum
-            if let Some(existing) = index.get_photo(guid) {
-                if existing.checksum == photo.checksum {
-                    // This photo is unchanged, don't need to process it
-                    unchanged_photos.push(SyncResult::Unchanged(guid.clone()));
-                    continue;
-                }
+            if let Some(existing) = index.get_photo(guid)
+                && existing.checksum == photo.checksum
+            {
+                // This photo is unchanged, don't need to process it
+                unchanged_photos.push(SyncResult::Unchanged(guid.clone()));
+                continue;
             }
 
             // This photo needs processing (new or updated)
@@ -600,10 +600,10 @@ impl Syncer {
         };
 
         // If the photo exists and checksums match, no need to update
-        if let Some(existing) = &existing {
-            if existing.checksum == photo.checksum {
-                return Ok(SyncResult::Unchanged(photo.guid.clone()));
-            }
+        if let Some(existing) = &existing
+            && existing.checksum == photo.checksum
+        {
+            return Ok(SyncResult::Unchanged(photo.guid.clone()));
         }
 
         // Create directory for this photo
@@ -718,10 +718,10 @@ impl Syncer {
         let existing = index.get_photo(&photo.guid);
 
         // If the photo exists and checksums match, no need to update
-        if let Some(existing) = existing {
-            if existing.checksum == photo.checksum {
-                return Ok(SyncResult::Unchanged(photo.guid.clone()));
-            }
+        if let Some(existing) = existing
+            && existing.checksum == photo.checksum
+        {
+            return Ok(SyncResult::Unchanged(photo.guid.clone()));
         }
 
         // Create directory for this photo

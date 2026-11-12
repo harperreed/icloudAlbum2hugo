@@ -20,16 +20,17 @@
 //!
 //! ## Error Handling
 //!
-//! The module defines a custom `ICloudError` type with variants for different
-//! error scenarios (invalid URLs, network errors, etc.) and implements proper
-//! error context and logging.
+//! All fallible functions in this module return [`anyhow::Result`] so that error
+//! handling is consistent with the rest of the codebase. Errors carry a
+//! human-readable message describing the failure (invalid URL, missing token,
+//! failed fetch, etc.) and, where an underlying error exists, it is attached as
+//! context so the full error chain is preserved.
 
-use anyhow::Result;
+use anyhow::{Context, Result, anyhow, bail};
 use chrono::{DateTime, Utc};
 use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt;
 use url::Url;
 
 /// Represents a single photo in an album with all necessary metadata
@@ -162,10 +163,8 @@ fn extract_token(album_url: &str) -> Result<String> {
     match format {
         ICloudUrlFormat::Standard | ICloudUrlFormat::WebWithParams => {
             // Validate and parse the URL
-            let url = ICloudError::context(
-                Url::parse(album_url),
-                format!("Invalid iCloud shared album URL: {album_url}"),
-            )?;
+            let url = Url::parse(album_url)
+                .with_context(|| format!("Invalid iCloud shared album URL: {album_url}"))?;
 
             // Extract the token (shared album ID) from the URL fragment
             url.fragment()
@@ -183,116 +182,36 @@ fn extract_token(album_url: &str) -> Result<String> {
                         .map(|t| t.to_string())
                 })
                 .ok_or_else(|| {
-                    anyhow::anyhow!(ICloudError::InvalidToken(
-                        "Missing or invalid token in fragment".to_string()
-                    ))
+                    anyhow!("Invalid iCloud token: Missing or invalid token in fragment")
                 })
         }
         ICloudUrlFormat::Invitation => {
             // For invitation URLs like https://share.icloud.com/photos/abc0defGHIjklMNO
             // Extract the token from the path
-            let url = ICloudError::context(
-                Url::parse(album_url),
-                format!("Invalid iCloud shared album invitation URL: {album_url}"),
-            )?;
-
-            // Use path_segments() which returns an iterator of segments
-            let mut segments = url.path_segments().ok_or_else(|| {
-                ICloudError::InvalidUrl("Invalid URL path: cannot be base".to_string())
+            let url = Url::parse(album_url).with_context(|| {
+                format!("Invalid iCloud shared album invitation URL: {album_url}")
             })?;
 
+            // Use path_segments() which returns an iterator of segments
+            let mut segments = url
+                .path_segments()
+                .ok_or_else(|| anyhow!("Invalid iCloud URL: Invalid URL path: cannot be base"))?;
+
             // Find "photos" segment and get the next segment as the token
-            if let Some("photos") = segments.next() {
-                if let Some(token) = segments.next() {
-                    return Ok(token.to_string());
-                }
+            if let Some("photos") = segments.next()
+                && let Some(token) = segments.next().filter(|token| !token.is_empty())
+            {
+                return Ok(token.to_string());
             }
 
             // If we didn't find a valid token after "photos"
-            Err(anyhow::anyhow!(ICloudError::InvalidToken(
-                "Unable to extract token from invitation URL path".to_string()
-            )))
+            Err(anyhow!(
+                "Invalid iCloud token: Unable to extract token from invitation URL path"
+            ))
         }
-        ICloudUrlFormat::Unknown => Err(anyhow::anyhow!(ICloudError::InvalidUrl(format!(
-            "Unsupported iCloud URL format: {album_url}"
-        )))),
-    }
-}
-
-/// Custom error type for iCloud fetching operations
-///
-/// This enum provides specific error variants for different failure scenarios
-/// when interacting with iCloud shared albums. Each variant includes a descriptive
-/// message to help with debugging and error handling.
-#[derive(Debug)]
-pub enum ICloudError {
-    /// Invalid URL format (not a valid iCloud shared album URL)
-    InvalidUrl(String),
-
-    /// Missing or invalid token in the URL
-    InvalidToken(String),
-
-    /// Network or API error when fetching album data
-    FetchError(String),
-
-    /// Error when parsing or processing photo data
-    PhotoProcessingError(String),
-
-    /// No derivatives found for a photo
-    NoDerivativesError(String),
-
-    /// Wraps an underlying error with context
-    Context {
-        /// The context message explaining what operation was being performed
-        context: String,
-        /// The underlying error that caused the failure
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
-}
-
-impl ICloudError {
-    /// Create a new error with additional context around an underlying error
-    pub fn with_context<E, C>(error: E, context: C) -> Self
-    where
-        E: std::error::Error + Send + Sync + 'static,
-        C: Into<String>,
-    {
-        Self::Context {
-            context: context.into(),
-            source: Box::new(error),
-        }
-    }
-
-    /// Wrap a Result error with additional context
-    pub fn context<T, E, C>(result: Result<T, E>, context: C) -> Result<T, Self>
-    where
-        E: std::error::Error + Send + Sync + 'static,
-        C: Into<String>,
-    {
-        result.map_err(|err| Self::with_context(err, context))
-    }
-}
-
-impl fmt::Display for ICloudError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidUrl(msg) => write!(f, "Invalid iCloud URL: {msg}"),
-            Self::InvalidToken(msg) => write!(f, "Invalid iCloud token: {msg}"),
-            Self::FetchError(msg) => write!(f, "Failed to fetch album: {msg}"),
-            Self::PhotoProcessingError(msg) => write!(f, "Error processing photo: {msg}"),
-            Self::NoDerivativesError(msg) => write!(f, "No suitable derivatives: {msg}"),
-            Self::Context { context, source } => write!(f, "{context}: {source}"),
-        }
-    }
-}
-
-/// Implement the standard error trait for proper error handling
-impl std::error::Error for ICloudError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Context { source, .. } => Some(source.as_ref()),
-            _ => None,
-        }
+        ICloudUrlFormat::Unknown => Err(anyhow!(
+            "Invalid iCloud URL: Unsupported iCloud URL format: {album_url}"
+        )),
     }
 }
 
@@ -317,13 +236,11 @@ fn extract_derivative_info(
 /// This ensures we always get the highest quality image available, regardless of the derivative name.
 /// Note: It's normal for iCloud to provide different derivative types for different photos.
 ///
-/// Returns a tuple of (url, width, height) or an error if no suitable derivative is found
-/// Result containing URL, width, height, and MIME type
+/// Returns a tuple of (url, width, height, mime type), or an error if no
+/// suitable derivative is found.
 type DerivativeInfo = (String, u32, u32, String);
 
-fn find_best_derivative(
-    photo: &icloud_album_rs::models::Image,
-) -> Result<DerivativeInfo, ICloudError> {
+fn find_best_derivative(photo: &icloud_album_rs::models::Image) -> Result<DerivativeInfo> {
     debug!("Finding best derivative for photo: {}", photo.photo_guid);
     trace!("Photo has {} derivatives", photo.derivatives.len());
 
@@ -397,10 +314,10 @@ fn find_best_derivative(
         "No derivatives with URL found for photo {}",
         photo.photo_guid
     );
-    Err(ICloudError::NoDerivativesError(format!(
-        "No derivatives with URL found for photo {}",
+    Err(anyhow!(
+        "No suitable derivatives: No derivatives with URL found for photo {}",
         photo.photo_guid
-    )))
+    ))
 }
 
 /// Fetches photos from an iCloud shared album using the icloud-album-rs crate
@@ -424,9 +341,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
         && !album_url.contains("share.icloud.com/photos")
     {
         error!("Invalid iCloud URL: {album_url}");
-        return Err(anyhow::anyhow!(ICloudError::InvalidUrl(
-            "URL doesn't appear to be an iCloud shared album".to_string()
-        )));
+        bail!("Invalid iCloud URL: URL doesn't appear to be an iCloud shared album");
     }
 
     // Determine URL format
@@ -445,7 +360,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
         }
         Err(e) => {
             error!("Failed to extract token: {e}");
-            return Err(anyhow::anyhow!(ICloudError::InvalidToken(e.to_string())));
+            return Err(e);
         }
     };
 
@@ -458,7 +373,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
         }
         Err(e) => {
             error!("Failed to fetch iCloud album: {e}");
-            return Err(anyhow::anyhow!(ICloudError::FetchError(e.to_string())));
+            return Err(anyhow!("Failed to fetch album: {e}"));
         }
     };
 
@@ -512,9 +427,7 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
     // If we didn't find any photos, that's suspicious
     if album.photos.is_empty() && error_count > 0 {
         error!("Failed to process any photos from the album despite finding {error_count} photos");
-        return Err(anyhow::anyhow!(ICloudError::PhotoProcessingError(
-            "Failed to process any photos from the album".to_string()
-        )));
+        bail!("Error processing photo: Failed to process any photos from the album");
     }
 
     debug!("Returning album with {} photos", album.photos.len());
@@ -522,15 +435,12 @@ pub async fn fetch_album(album_url: &str) -> Result<Album> {
 }
 
 /// Parse a date string in RFC3339 format to a UTC DateTime
-fn parse_photo_date(date_str: &str) -> Result<DateTime<Utc>, ICloudError> {
+fn parse_photo_date(date_str: &str) -> Result<DateTime<Utc>> {
     debug!("Parsing date: {date_str}");
 
     DateTime::parse_from_rfc3339(date_str)
         .map(|dt| dt.with_timezone(&Utc))
-        .map_err(|e| {
-            warn!("Failed to parse date '{date_str}': {e}");
-            ICloudError::PhotoProcessingError(format!("Failed to parse date {date_str}: {e}"))
-        })
+        .with_context(|| format!("Error processing photo: Failed to parse date {date_str}"))
 }
 
 /// Generate a checksum for a photo based on its GUID and URL
@@ -565,10 +475,7 @@ fn determine_mime_type(url: &str, derivative_key: &str) -> String {
 }
 
 /// Process a single photo from the iCloud API response and add it to the album
-fn process_photo(
-    album: &mut Album,
-    photo: icloud_album_rs::models::Image,
-) -> Result<(), ICloudError> {
+fn process_photo(album: &mut Album, photo: icloud_album_rs::models::Image) -> Result<()> {
     debug!("Processing photo: {}", photo.photo_guid);
     trace!(
         "Photo data: caption={:?}, derivatives_count={}",
@@ -627,6 +534,103 @@ fn process_photo(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_extract_token_standard_format() {
+        let token = extract_token("https://www.icloud.com/sharedalbum/#B0abCdEfGhIj")
+            .expect("standard URL should yield a token");
+        assert_eq!(token, "B0abCdEfGhIj");
+    }
+
+    #[test]
+    fn test_extract_token_with_query_parameters() {
+        let token = extract_token("https://www.icloud.com/sharedalbum/#B0123456789?param=value")
+            .expect("URL with query parameters should yield a token");
+        assert_eq!(token, "B0123456789");
+    }
+
+    #[test]
+    fn test_extract_token_invitation_format() {
+        let token = extract_token("https://share.icloud.com/photos/abc0defGHIjklMNO")
+            .expect("invitation URL should yield a token");
+        assert_eq!(token, "abc0defGHIjklMNO");
+    }
+
+    #[test]
+    fn test_extract_token_reports_invalid_token() {
+        let err = extract_token("https://share.icloud.com/photos/")
+            .expect_err("invitation URL without a token should fail");
+        assert!(
+            err.to_string().contains("Invalid iCloud token"),
+            "unexpected error message: {err}"
+        );
+    }
+
+    #[test]
+    fn test_extract_token_reports_unsupported_url() {
+        let err = extract_token("https://www.example.com/photos/abc")
+            .expect_err("unsupported URL should fail");
+        assert!(
+            err.to_string().contains("Invalid iCloud URL"),
+            "unexpected error message: {err}"
+        );
+    }
+
+    #[test]
+    fn test_find_best_derivative_without_derivatives_is_anyhow_error() {
+        let image = icloud_album_rs::models::Image::default();
+
+        let err = find_best_derivative(&image).expect_err("photo without derivatives should fail");
+
+        // Errors should flow through `anyhow` with a human readable message.
+        let message = format!("{err:#}");
+        assert!(
+            message.contains("No derivatives with URL found"),
+            "unexpected error message: {message}"
+        );
+    }
+
+    #[test]
+    fn test_parse_photo_date_error_preserves_source()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let err = parse_photo_date("not-a-date").expect_err("invalid date should fail");
+
+        assert!(
+            err.to_string().contains("Failed to parse date"),
+            "unexpected error message: {err}"
+        );
+        assert!(
+            std::error::Error::source(&*err).is_some(),
+            "underlying parse error should be kept in the error chain"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_fetch_album_rejects_non_icloud_url() {
+        let err = fetch_album("https://www.example.com/album")
+            .await
+            .expect_err("non-iCloud URL should fail without any network access");
+
+        assert!(
+            err.to_string()
+                .contains("URL doesn't appear to be an iCloud shared album"),
+            "unexpected error message: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_fetch_album_reports_invalid_token_for_icloud_url() {
+        let err = fetch_album("https://share.icloud.com/photos/")
+            .await
+            .expect_err("iCloud URL without a token should fail without network access");
+
+        assert!(
+            err.to_string().contains("Invalid iCloud token"),
+            "unexpected error message: {err}"
+        );
+    }
 
     #[test]
     fn test_album_new() {
